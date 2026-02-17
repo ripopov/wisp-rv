@@ -18,6 +18,9 @@ Assumption: all lower-numbered stages are fully implemented, all tests pass, and
   - Pre-CSR stages: `-march=rv64i -mabi=lp64`
   - CSR-enabled stages: `-march=rv64i_zicsr -mabi=lp64`
   - M-extension stages: `-march=rv64im_zicsr -mabi=lp64`
+- Integration tests must compile test programs from source with `riscv64-unknown-elf-gcc`.
+- Prebuilt ELF/BIN images are not the source of truth for integration coverage.
+- Integration test entrypoints should fail fast when the compiler toolchain is missing.
 - Build flow for each integration program:
   1. Compile source to ELF.
   2. Optionally convert ELF to `.bin` if the memory model needs a flat image.
@@ -39,9 +42,10 @@ Apply this workflow to every stage, in order:
 1. Write module(s) under `units/<unit-name>/rtl/`.
 2. Add a detailed module doc comment to each new RTL module.
 3. Write tests under `units/<unit-name>/tb/` and integration tests under `tests/integration/` when stage-level behavior crosses unit boundaries.
-4. Run stage-local tests and verify all pass.
-5. Run full test suite and verify no regression.
-6. Update `ImplementationPlan.md`:
+4. For integration tests, compile test programs from source using `riscv64-unknown-elf-gcc` with stage-appropriate ISA flags.
+5. Run stage-local tests and verify all pass.
+6. Run full test suite and verify no regression.
+7. Update `ImplementationPlan.md`:
    - advance `Current implementation stage`
    - mark completed stage(s)
    - record any scope changes or deferred work
@@ -84,7 +88,9 @@ Suggested header template:
 - [ ] Stage 08 - CSR, exceptions, and interrupts
 - [ ] Stage 09 - M extension (multiply/divide)
 - [ ] Stage 10 - Memory subsystem integration
-- [ ] Stage 11 - Full-system validation and performance closure
+- [ ] Stage 11 - Integration program build pipeline (real compiler)
+- [ ] Stage 12 - Full-system functional validation
+- [ ] Stage 13 - Performance closure and regression gates
 
 ---
 
@@ -345,25 +351,72 @@ Performance tests:
 
 ---
 
-## Stage 11 - Full-system validation and performance closure
+## Stage 11 - Integration program build pipeline (real compiler)
 
 ### Modules we are adding
 
-- `tests/integration/test_rv64_programs.py` (end-to-end program suite).
-- `tests/integration/test_randomized_streams.py` (randomized long-run integration tests).
-- `tests/integration/test_perf_smoke.py` (performance guardrails with threshold checks).
-- Optional support utilities under `tests/integration/utils/` for ELF loading and reference checking.
 - `tests/integration/programs/` (bare-metal RV64 assembly/C programs and linker scripts used by tests).
-- Optional helper script: `tests/integration/utils/build_rv64_program.py` (wrapper over `riscv64-unknown-elf-*` tools).
+- `tests/integration/linker/` (linker scripts shared by integration test programs).
+- `tests/integration/utils/build_rv64_program.py` (wrapper over `riscv64-unknown-elf-*` tools).
+- `tests/integration/utils/toolchain.py` (compiler discovery, version checks, and fail-fast diagnostics).
+- `tests/integration/test_program_build.py` (compiler pipeline smoke and artifact checks).
 
 ### Test plan
 
 Functional tests:
 
-1. Run a curated RV64 program suite (arithmetic, branch, memory, traps, M-extension paths).
-2. Build each integration program with `riscv64-unknown-elf-gcc` using stage-appropriate ISA flags before simulation.
-3. Run long randomized instruction streams and compare architectural state to software reference model.
-4. Run regression with deterministic seeds and store failures as reproducible artifacts.
+1. Compile representative `.S` and `.c` programs with `riscv64-unknown-elf-gcc` using stage-appropriate ISA flags.
+2. Verify required build artifacts are generated (`.elf`, `.map`, disassembly, and optional `.bin`).
+3. Verify integration tests consume compiler-generated artifacts, not prebuilt checked-in binaries.
+4. Verify toolchain-missing path fails quickly with a clear error message.
+
+Performance tests:
+
+1. Track compile time for the integration program set and establish a CI budget.
+2. Evaluate parallel build options to reduce test preparation latency.
+
+---
+
+## Stage 12 - Full-system functional validation
+
+### Modules we are adding
+
+- `tests/integration/test_rv64_programs.py` (curated end-to-end RV64 program suite).
+- `tests/integration/test_randomized_streams.py` (randomized long-run integration tests).
+- `tests/integration/utils/elf_loader.py` (ELF loading support for simulation harness).
+- `tests/integration/utils/reference_model.py` (architectural state checker support).
+
+### Test plan
+
+Functional tests:
+
+1. Build and run a curated RV64 program suite (arithmetic, branch, memory, traps, and M-extension where enabled).
+2. Run long randomized instruction streams and compare architectural state against a software reference model.
+3. Verify deterministic seed replay and preserve failure artifacts for debug.
+4. Verify instruction retirement traces align with compiled program disassembly.
+
+Performance tests:
+
+1. Track total runtime of the full functional integration suite and set an upper bound budget.
+2. Track cycles-to-completion for canonical smoke programs to detect major control-path regressions.
+
+---
+
+## Stage 13 - Performance closure and regression gates
+
+### Modules we are adding
+
+- `tests/integration/test_perf_smoke.py` (performance guardrails with threshold checks).
+- `tests/integration/benchmarks/` (benchmark program sources compiled with the real toolchain).
+- `tests/integration/utils/perf_metrics.py` (CPI/latency collection and trend reporting).
+
+### Test plan
+
+Functional tests:
+
+1. Verify benchmark harness correctness (program start/end detection, cycle counting, metric extraction).
+2. Verify each benchmark binary is built from source with `riscv64-unknown-elf-gcc` before simulation.
+3. Verify threshold-check logic reports actionable failure output.
 
 Performance tests:
 

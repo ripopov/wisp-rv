@@ -19,6 +19,7 @@ This document defines project goals and non-negotiable requirements for contribu
 - Every new unit must include at least one passing cocotb test before merge.
 - Unit tests should include directed edge cases and randomized checks.
 - Top-level CPU + memory subsystem tests must be placed in `tests/integration/` and run complete RV64 programs end-to-end.
+- Integration tests must build RV64 programs from source with `riscv64-unknown-elf-gcc`; prebuilt ELF/BIN files are not the primary verification path.
 
 ## Toolchain requirements
 
@@ -47,6 +48,8 @@ This document defines project goals and non-negotiable requirements for contribu
 riscv64-unknown-elf-gcc <isa-flags> -ffreestanding -nostdlib -nostartfiles \
   -T <linker-script.ld> -Wl,-Map,<program>.map -o <program>.elf <program>.S
 ```
+
+- In automated tests, compile programs before simulation and fail fast if toolchain binaries are missing.
 
 - Convert ELF to a flat binary image when needed by the memory model:
 
