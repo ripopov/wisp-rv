@@ -1,6 +1,6 @@
 # Implementation Plan: Pipelined RV64 Processor
 
-Current implementation stage: **Stage 12 - Full-system functional validation**.
+Current implementation stage: **Stage 13 - Performance closure and regression gates**.
 
 Assumption: all lower-numbered stages are fully implemented, all tests pass, and changes are merged before work begins on the current stage.
 
@@ -322,8 +322,8 @@ A bubble (invalid instruction) is represented by deasserting the stage's `valid`
 - [x] Stage 09 - M extension (multiply/divide)
 - [x] Stage 10 - Memory subsystem integration
 - [x] Stage 11 - Integration program build pipeline (real compiler)
-- [ ] Stage 12 - Full-system functional validation  <-- current
-- [ ] Stage 13 - Performance closure and regression gates
+- [x] Stage 12 - Full-system functional validation
+- [ ] Stage 13 - Performance closure and regression gates  <-- current
 
 ---
 

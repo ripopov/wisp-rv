@@ -150,6 +150,12 @@ Run integration tests:
 PATH="$(pwd)/.venv/bin:$PATH" make -C tests/integration SIM=verilator
 ```
 
+The integration Makefile runs:
+
+- `test_core_top_integration.py`
+- `test_rv64_programs.py`
+- `test_randomized_streams.py`
+
 Run integration build-pipeline tests:
 
 ```bash

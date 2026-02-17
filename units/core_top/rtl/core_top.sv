@@ -33,7 +33,10 @@ module core_top #(
     output logic [63:0] dbg_if_pc,
     output logic        dbg_wb_valid,
     output logic [4:0]  dbg_wb_rd,
-    output logic [63:0] dbg_wb_data
+    output logic [63:0] dbg_wb_data,
+    output logic        dbg_retire_valid,
+    output logic [63:0] dbg_retire_pc,
+    output logic [31:0] dbg_retire_instr
 );
     import rv64_pkg::*;
 
@@ -784,4 +787,7 @@ module core_top #(
     assign dbg_wb_valid = wb_write_enable;
     assign dbg_wb_rd = wb_rd;
     assign dbg_wb_data = wb_data;
+    assign dbg_retire_valid = retire_valid;
+    assign dbg_retire_pc = wb_pc;
+    assign dbg_retire_instr = wb_instr;
 endmodule

@@ -27,7 +27,10 @@ module memory_subsystem #(
     output logic [63:0] dbg_if_pc,
     output logic        dbg_wb_valid,
     output logic [4:0]  dbg_wb_rd,
-    output logic [63:0] dbg_wb_data
+    output logic [63:0] dbg_wb_data,
+    output logic        dbg_retire_valid,
+    output logic [63:0] dbg_retire_pc,
+    output logic [31:0] dbg_retire_instr
 );
     logic        imem_ready;
     logic [31:0] imem_rdata;
@@ -70,7 +73,10 @@ module memory_subsystem #(
         .dbg_if_pc(dbg_if_pc),
         .dbg_wb_valid(dbg_wb_valid),
         .dbg_wb_rd(dbg_wb_rd),
-        .dbg_wb_data(dbg_wb_data)
+        .dbg_wb_data(dbg_wb_data),
+        .dbg_retire_valid(dbg_retire_valid),
+        .dbg_retire_pc(dbg_retire_pc),
+        .dbg_retire_instr(dbg_retire_instr)
     );
 
     ram_model #(

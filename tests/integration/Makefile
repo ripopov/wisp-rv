@@ -37,7 +37,7 @@ VERILOG_SOURCES += $(PWD)/../../units/core_top/rtl/core_top.sv
 VERILOG_SOURCES += $(PWD)/../../units/ram_model/rtl/ram_model.sv
 VERILOG_SOURCES += $(PWD)/../../units/memory_subsystem/rtl/memory_subsystem.sv
 COCOTB_TOPLEVEL := memory_subsystem
-COCOTB_TEST_MODULES := test_core_top_integration
+COCOTB_TEST_MODULES := test_core_top_integration,test_rv64_programs,test_randomized_streams
 export PYTHONPATH := $(PWD):$(PYTHONPATH)
 
 COMPILE_ARGS += -Wall -Wno-DECLFILENAME -Wno-UNUSEDSIGNAL -Wno-UNSIGNED -Wno-UNUSEDPARAM
