@@ -68,3 +68,13 @@ riscv64-unknown-elf-objdump -d -M no-aliases <program>.elf
 - Keep test stimulus deterministic where possible (seed randomized tests).
 - Prefer small, independently testable units before integration.
 - Update `README.md` when structure, goals, or workflows change.
+
+## Stage-06 lessons learned (keep applying)
+
+- In cocotb memory-driver loops, synchronize with the DUT combinational outputs using `await ReadWrite()` before sampling `imem_addr`/`dmem_*` and driving memory responses. This avoids one-cycle skew bugs.
+- Do not use `Timer(0)` as a delta-cycle sync in cocotb 2.x; it raises an error. Use `ReadWrite()` (or another explicit trigger) instead.
+- Stage-06 core has no forwarding or hazard detection. Directed and integration programs must insert explicit NOP spacing between producer/consumer instruction pairs, especially ALU->use, load->use, and U-type/JALR setup sequences.
+- For AUIPC/JALR tests, avoid brittle hard-coded offsets when possible. Prefer label/fixup-based immediate generation in Python-built programs; if using hand-written assembly, update offsets whenever instruction spacing changes.
+- Branch/redirect tests should assert both sides of correctness: taken-path side effects must appear and wrong-path side effects must remain absent.
+- Keep integration completion signaling deterministic: write `tohost`, then allow a short drain window so in-flight pipeline activity can retire before final memory assertions.
+- Local test commands should include the project virtualenv on `PATH` so `cocotb-config` resolves, for example: `PATH="$(pwd)/.venv/bin:$PATH" make -C <target> SIM=verilator`.
