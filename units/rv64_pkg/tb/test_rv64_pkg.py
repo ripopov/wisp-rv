@@ -18,3 +18,8 @@ async def test_package_constants(dut):
 
     assert int(dut.fmt_i.value) == 1
     assert int(dut.fmt_j.value) == 5
+
+    assert int(dut.bits_if_id.value) == 97
+    assert int(dut.bits_id_ex.value) == 294
+    assert int(dut.bits_ex_mem.value) == 271
+    assert int(dut.bits_mem_wb.value) == 136

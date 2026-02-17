@@ -17,7 +17,11 @@ module rv64_pkg_sanity (
     output logic [3:0] alu_add,
     output logic [3:0] alu_sra,
     output logic [2:0] fmt_i,
-    output logic [2:0] fmt_j
+    output logic [2:0] fmt_j,
+    output logic [31:0] bits_if_id,
+    output logic [31:0] bits_id_ex,
+    output logic [31:0] bits_ex_mem,
+    output logic [31:0] bits_mem_wb
 );
     import rv64_pkg::*;
 
@@ -31,4 +35,8 @@ module rv64_pkg_sanity (
     assign alu_sra = ALU_OP_SRA;
     assign fmt_i = I_TYPE;
     assign fmt_j = J_TYPE;
+    assign bits_if_id = $bits(if_id_reg_t);
+    assign bits_id_ex = $bits(id_ex_reg_t);
+    assign bits_ex_mem = $bits(ex_mem_reg_t);
+    assign bits_mem_wb = $bits(mem_wb_reg_t);
 endmodule

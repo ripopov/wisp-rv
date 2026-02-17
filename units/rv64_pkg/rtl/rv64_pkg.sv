@@ -101,4 +101,58 @@ package rv64_pkg;
         logic      jump;
         logic      is_word_op;
     } id_ctrl_t;
+
+    // Pipeline register payloads used starting in Stage 02.
+    typedef struct packed {
+        logic [63:0] pc;
+        logic [31:0] instr;
+        logic        valid;
+    } if_id_reg_t;
+
+    typedef struct packed {
+        logic [63:0] pc;
+        logic [63:0] rs1_data;
+        logic [63:0] rs2_data;
+        logic [63:0] imm;
+        logic [4:0]  rd;
+        logic [4:0]  rs1_addr;
+        logic [4:0]  rs2_addr;
+        logic [2:0]  funct3;
+        logic [6:0]  funct7;
+        id_ctrl_t    ctrl;
+        logic        valid;
+    } id_ex_reg_t;
+
+    typedef struct packed {
+        logic mem_read;
+        logic mem_write;
+        logic reg_write;
+        logic mem_to_reg;
+        logic is_word_op;
+    } ex_mem_ctrl_t;
+
+    typedef struct packed {
+        logic [63:0]   pc;
+        logic [63:0]   alu_result;
+        logic [63:0]   rs2_data;
+        logic [4:0]    rd;
+        logic [2:0]    funct3;
+        ex_mem_ctrl_t  ctrl;
+        logic          branch_taken;
+        logic [63:0]   branch_target;
+        logic          valid;
+    } ex_mem_reg_t;
+
+    typedef struct packed {
+        logic reg_write;
+        logic mem_to_reg;
+    } mem_wb_ctrl_t;
+
+    typedef struct packed {
+        logic [63:0]   alu_result;
+        logic [63:0]   mem_data;
+        logic [4:0]    rd;
+        mem_wb_ctrl_t  ctrl;
+        logic          valid;
+    } mem_wb_reg_t;
 endpackage

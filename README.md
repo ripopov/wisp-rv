@@ -44,6 +44,12 @@ RV64 RISC-V core project in SystemVerilog with unit tests in Python (cocotb) and
 - ID control decoder
   - RTL: `units/id_control/rtl/id_control.sv`
   - Testbench: `units/id_control/tb/test_id_control.py`
+- Register file
+  - RTL: `units/regfile/rtl/regfile.sv`
+  - Testbench: `units/regfile/tb/test_regfile.py`
+- Pipeline registers
+  - RTL: `units/pipeline_regs/rtl/if_id_reg.sv`, `units/pipeline_regs/rtl/id_ex_reg.sv`, `units/pipeline_regs/rtl/ex_mem_reg.sv`, `units/pipeline_regs/rtl/mem_wb_reg.sv`
+  - Testbench: `units/pipeline_regs/tb/test_pipeline_regs.py`
 
 Setup Python dependencies (Python 3.13+):
 
