@@ -15,10 +15,31 @@ LUI = 0b0110111
 AUIPC = 0b0010111
 JAL = 0b1101111
 JALR = 0b1100111
+SYSTEM = 0b1110011
 
 F3_BEQ = 0b000
 F3_LD = 0b011
 F3_SD = 0b011
+F3_CSRRW = 0b001
+F3_CSRRS = 0b010
+F3_CSRRC = 0b011
+F3_CSRRWI = 0b101
+F3_CSRRSI = 0b110
+F3_CSRRCI = 0b111
+
+CSR_MSTATUS = 0x300
+CSR_MIE = 0x304
+CSR_MTVEC = 0x305
+CSR_MSCRATCH = 0x340
+CSR_MEPC = 0x341
+CSR_MCAUSE = 0x342
+CSR_MTVAL = 0x343
+CSR_MCYCLE = 0xB00
+CSR_MINSTRET = 0xB02
+CSR_MVENDORID = 0xF11
+
+SYSTEM_IMM_ECALL = 0x000
+SYSTEM_IMM_MRET = 0x302
 
 NOP = 0x00000013
 TOHOST_ADDR = 0x200
@@ -159,6 +180,33 @@ class AsmBuilder:
     def jalr(self, rd: int, rs1: int, imm12: int) -> None:
         self.emit(enc_i(imm12, rs1, 0b000, rd, JALR))
 
+    def csrrw(self, rd: int, csr: int, rs1: int) -> None:
+        self.emit(enc_i(csr, rs1, F3_CSRRW, rd, SYSTEM))
+
+    def csrrs(self, rd: int, csr: int, rs1: int) -> None:
+        self.emit(enc_i(csr, rs1, F3_CSRRS, rd, SYSTEM))
+
+    def csrrc(self, rd: int, csr: int, rs1: int) -> None:
+        self.emit(enc_i(csr, rs1, F3_CSRRC, rd, SYSTEM))
+
+    def csrrwi(self, rd: int, csr: int, zimm: int) -> None:
+        self.emit(enc_i(csr, zimm, F3_CSRRWI, rd, SYSTEM))
+
+    def csrrsi(self, rd: int, csr: int, zimm: int) -> None:
+        self.emit(enc_i(csr, zimm, F3_CSRRSI, rd, SYSTEM))
+
+    def csrrci(self, rd: int, csr: int, zimm: int) -> None:
+        self.emit(enc_i(csr, zimm, F3_CSRRCI, rd, SYSTEM))
+
+    def ecall(self) -> None:
+        self.emit(enc_i(SYSTEM_IMM_ECALL, 0, 0b000, 0, SYSTEM))
+
+    def mret(self) -> None:
+        self.emit(enc_i(SYSTEM_IMM_MRET, 0, 0b000, 0, SYSTEM))
+
+    def raw(self, word: int) -> None:
+        self.emit(word)
+
     def resolve(self) -> list[int]:
         for idx, kind, params, label in self.fixups:
             if label not in self.labels:
@@ -187,70 +235,85 @@ class AsmBuilder:
         return list(self.words)
 
 
-def build_stage7_program() -> tuple[list[int], dict[str, int]]:
+def build_stage8_program() -> tuple[list[int], dict[str, int]]:
     b = AsmBuilder()
 
     # Bring-up NOP to avoid reset/fetch edge sensitivity.
     b.nop()
 
-    # EX/MEM forwarding.
+    # Baseline forwarding sanity.
     b.addi(1, 0, 5)
     b.addi(2, 1, 10)
     b.sd(2, 0, 0x100)
 
-    # MEM/WB forwarding.
-    b.addi(3, 0, 7)
-    b.addi(4, 0, 1)
-    b.addi(5, 3, 9)
-    b.sd(5, 0, 0x108)
-
-    # EX/MEM priority over MEM/WB.
-    b.addi(6, 0, 5)
-    b.addi(6, 0, 7)
-    b.addi(7, 6, 10)
-    b.sd(7, 0, 0x110)
-
-    # x0 must never receive forwarded data.
-    b.addi(0, 0, 5)
-    b.addi(8, 0, 10)
-    b.sd(8, 0, 0x118)
-
-    # Store-data forwarding and load-use hazard stalling.
-    b.addi(9, 0, 0x44)
-    b.sd(9, 0, 0x120)
-    b.ld(10, 0, 0x120)
-    b.addi(11, 10, 1)
-    b.sd(11, 0, 0x128)
-
-    # Branch with forwarded operands + wrong-path flush.
-    b.addi(12, 0, 5)
-    b.addi(13, 0, 5)
-    b.beq(12, 13, "branch_taken")
-    b.addi(14, 0, 99)
-    b.sd(14, 0, 0x158)
-    b.label("branch_taken")
-    b.addi(14, 0, 42)
-    b.sd(14, 0, 0x130)
-
-    # AUIPC + JALR with forwarded base + wrong-path flush.
-    b.label("auipc_site")
+    # Program trap vector.
+    b.label("mtvec_base")
     b.auipc(20, 0)
-    b.addi_label_delta(20, 20, "auipc_site", "jalr_target")
-    b.label("jalr_site")
-    b.jalr(21, 20, 0)
-    b.addi(22, 0, 0xDE)
-    b.sd(22, 0, 0x150)
-    b.label("jalr_target")
-    b.addi(22, 0, 0x33)
-    b.sd(22, 0, 0x138)
-    b.sd(21, 0, 0x140)
+    b.addi_label_delta(20, 20, "mtvec_base", "trap_handler")
+    b.csrrw(0, CSR_MTVEC, 20)
 
-    # LUI + ADDI constant build with forwarding.
-    b.lui(23, 0x12345)
-    b.addi(23, 23, 0x678)
-    b.sd(23, 0, 0x148)
+    # CSR R/W semantics on mstatus.
+    b.addi(3, 0, 0x8)
+    b.csrrw(4, CSR_MSTATUS, 3)
+    b.sd(4, 0, 0x108)
+    b.csrrs(5, CSR_MSTATUS, 0)
+    b.sd(5, 0, 0x110)
+    b.csrrci(0, CSR_MSTATUS, 0x8)
+    b.csrrs(6, CSR_MSTATUS, 0)
+    b.sd(6, 0, 0x118)
 
-    # Completion signal with dependencies on both store operands.
+    # CSRRS with rs1=x0 must not write.
+    b.addi(7, 0, 0x80)
+    b.csrrw(0, CSR_MIE, 7)
+    b.csrrs(8, CSR_MIE, 0)
+    b.sd(8, 0, 0x120)
+    b.csrrs(9, CSR_MIE, 0)
+    b.sd(9, 0, 0x128)
+
+    # Illegal instruction trap.
+    b.label("illegal_site")
+    b.raw(0x00000000)
+    b.label("after_illegal")
+    b.csrrs(10, CSR_MCAUSE, 0)
+    b.sd(10, 0, 0x130)
+    b.csrrs(11, CSR_MEPC, 0)
+    b.sd(11, 0, 0x138)
+    b.csrrs(12, CSR_MTVAL, 0)
+    b.sd(12, 0, 0x140)
+
+    # ECALL trap.
+    b.label("ecall_site")
+    b.ecall()
+    b.label("after_ecall")
+    b.csrrs(13, CSR_MCAUSE, 0)
+    b.sd(13, 0, 0x148)
+    b.csrrs(14, CSR_MEPC, 0)
+    b.sd(14, 0, 0x150)
+    b.csrrs(15, CSR_MTVAL, 0)
+    b.sd(15, 0, 0x158)
+    b.csrrs(16, CSR_MSCRATCH, 0)
+    b.sd(16, 0, 0x160)
+
+    # CSR counters must advance.
+    b.csrrs(17, CSR_MCYCLE, 0)
+    b.sd(17, 0, 0x168)
+    b.csrrs(18, CSR_MINSTRET, 0)
+    b.sd(18, 0, 0x170)
+
+    # Illegal CSR write (read-only mvendorid) must trap as illegal instruction.
+    b.label("ro_write_site")
+    b.csrrw(19, CSR_MVENDORID, 1)
+    b.label("after_ro_write")
+    b.csrrs(20, CSR_MCAUSE, 0)
+    b.sd(20, 0, 0x178)
+    b.csrrs(21, CSR_MEPC, 0)
+    b.sd(21, 0, 0x180)
+    b.csrrs(22, CSR_MTVAL, 0)
+    b.sd(22, 0, 0x188)
+    b.csrrs(23, CSR_MSCRATCH, 0)
+    b.sd(23, 0, 0x190)
+
+    # Completion signal.
     b.addi(24, 0, TOHOST_ADDR)
     b.addi(25, 0, 1)
     b.sd(25, 24, 0)
@@ -258,20 +321,38 @@ def build_stage7_program() -> tuple[list[int], dict[str, int]]:
     b.label("spin")
     b.jal(0, "spin")
 
+    # Trap handler: skip trapping instruction, bump trap count, return.
+    b.label("trap_handler")
+    b.csrrs(26, CSR_MEPC, 0)
+    b.addi(26, 26, 4)
+    b.csrrw(0, CSR_MEPC, 26)
+    b.csrrs(27, CSR_MSCRATCH, 0)
+    b.addi(27, 27, 1)
+    b.csrrw(0, CSR_MSCRATCH, 27)
+    b.mret()
+
     words = b.resolve()
 
+    ro_write_instr = enc_i(CSR_MVENDORID, 1, F3_CSRRW, 19, SYSTEM)
+
     expected = {
-        "ex_mem_forward": 15,
-        "mem_wb_forward": 16,
-        "ex_mem_priority": 17,
-        "x0_guard": 10,
-        "store_load": 0x45,
-        "branch_taken": 42,
-        "branch_wrong_path": 0,
-        "jalr_target_value": 0x33,
-        "jalr_wrong_path": 0,
-        "lui_addi_value": 0x1234_5678,
-        "jalr_link": b.labels["jalr_site"] + 4,
+        "forward_basic": 15,
+        "mstatus_old": 0,
+        "mstatus_set": 0x8,
+        "mstatus_clear": 0,
+        "mie_read_1": 0x80,
+        "mie_read_2": 0x80,
+        "illegal_cause": 2,
+        "illegal_mepc": b.labels["illegal_site"] + 4,
+        "illegal_mtval": 0,
+        "ecall_cause": 11,
+        "ecall_mepc": b.labels["ecall_site"] + 4,
+        "ecall_mtval": 0,
+        "trap_count_after_ecall": 2,
+        "ro_write_cause": 2,
+        "ro_write_mepc": b.labels["ro_write_site"] + 4,
+        "ro_write_mtval": ro_write_instr,
+        "final_trap_count": 3,
     }
     return words, expected
 
@@ -362,41 +443,58 @@ async def run_program(
 
 def assert_program_results(dmem: dict[int, int], expected: dict[str, int]) -> None:
     observed = {
-        "ex_mem_forward": read_u64(dmem, 0x100),
-        "mem_wb_forward": read_u64(dmem, 0x108),
-        "ex_mem_priority": read_u64(dmem, 0x110),
-        "x0_guard": read_u64(dmem, 0x118),
-        "store_value": read_u64(dmem, 0x120),
-        "store_load": read_u64(dmem, 0x128),
-        "branch_taken": read_u64(dmem, 0x130),
-        "branch_wrong_path": read_u64(dmem, 0x158),
-        "jalr_target_value": read_u64(dmem, 0x138),
-        "jalr_link": read_u64(dmem, 0x140),
-        "lui_addi_value": read_u64(dmem, 0x148),
-        "jalr_wrong_path": read_u64(dmem, 0x150),
+        "forward_basic": read_u64(dmem, 0x100),
+        "mstatus_old": read_u64(dmem, 0x108),
+        "mstatus_set": read_u64(dmem, 0x110),
+        "mstatus_clear": read_u64(dmem, 0x118),
+        "mie_read_1": read_u64(dmem, 0x120),
+        "mie_read_2": read_u64(dmem, 0x128),
+        "illegal_cause": read_u64(dmem, 0x130),
+        "illegal_mepc": read_u64(dmem, 0x138),
+        "illegal_mtval": read_u64(dmem, 0x140),
+        "ecall_cause": read_u64(dmem, 0x148),
+        "ecall_mepc": read_u64(dmem, 0x150),
+        "ecall_mtval": read_u64(dmem, 0x158),
+        "trap_count_after_ecall": read_u64(dmem, 0x160),
+        "mcycle_snapshot": read_u64(dmem, 0x168),
+        "minstret_snapshot": read_u64(dmem, 0x170),
+        "ro_write_cause": read_u64(dmem, 0x178),
+        "ro_write_mepc": read_u64(dmem, 0x180),
+        "ro_write_mtval": read_u64(dmem, 0x188),
+        "final_trap_count": read_u64(dmem, 0x190),
         "tohost": read_u64(dmem, TOHOST_ADDR),
     }
-    assert observed["jalr_link"] == expected["jalr_link"], observed
-    assert observed["ex_mem_forward"] == expected["ex_mem_forward"], observed
-    assert observed["mem_wb_forward"] == expected["mem_wb_forward"], observed
-    assert observed["ex_mem_priority"] == expected["ex_mem_priority"], observed
-    assert observed["x0_guard"] == expected["x0_guard"], observed
-    assert observed["branch_taken"] == expected["branch_taken"], observed
-    assert observed["branch_wrong_path"] == expected["branch_wrong_path"], observed
-    assert observed["store_value"] == 0x44, observed
-    assert observed["store_load"] == expected["store_load"], observed
-    assert observed["jalr_target_value"] == expected["jalr_target_value"], observed
-    assert observed["jalr_wrong_path"] == expected["jalr_wrong_path"], observed
-    assert observed["lui_addi_value"] == expected["lui_addi_value"], observed
+    assert observed["forward_basic"] == expected["forward_basic"], observed
+    assert observed["mstatus_old"] == expected["mstatus_old"], observed
+    assert observed["mstatus_set"] == expected["mstatus_set"], observed
+    assert observed["mstatus_clear"] == expected["mstatus_clear"], observed
+    assert observed["mie_read_1"] == expected["mie_read_1"], observed
+    assert observed["mie_read_2"] == expected["mie_read_2"], observed
+    assert observed["illegal_cause"] == expected["illegal_cause"], observed
+    assert observed["illegal_mepc"] == expected["illegal_mepc"], observed
+    assert observed["illegal_mtval"] == expected["illegal_mtval"], observed
+    assert observed["ecall_cause"] == expected["ecall_cause"], observed
+    assert observed["ecall_mepc"] == expected["ecall_mepc"], observed
+    assert observed["ecall_mtval"] == expected["ecall_mtval"], observed
+    assert observed["trap_count_after_ecall"] == expected["trap_count_after_ecall"], (
+        observed
+    )
+    assert observed["ro_write_cause"] == expected["ro_write_cause"], observed
+    assert observed["ro_write_mepc"] == expected["ro_write_mepc"], observed
+    assert observed["ro_write_mtval"] == expected["ro_write_mtval"], observed
+    assert observed["final_trap_count"] == expected["final_trap_count"], observed
+    assert observed["mcycle_snapshot"] > 0, observed
+    assert observed["minstret_snapshot"] > 0, observed
+    assert observed["mcycle_snapshot"] >= observed["minstret_snapshot"], observed
     assert observed["tohost"] == 1, observed
 
 
 @cocotb.test()
-async def test_core_top_stage7_program(dut):
+async def test_core_top_stage8_program(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset_dut(dut)
 
-    program_words, expected = build_stage7_program()
+    program_words, expected = build_stage8_program()
     dmem = await run_program(
         dut,
         program_words,
@@ -407,11 +505,11 @@ async def test_core_top_stage7_program(dut):
 
 
 @cocotb.test()
-async def test_core_top_stage7_program_with_backpressure(dut):
+async def test_core_top_stage8_program_with_backpressure(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset_dut(dut)
 
-    program_words, expected = build_stage7_program()
+    program_words, expected = build_stage8_program()
     dmem = await run_program(
         dut,
         program_words,

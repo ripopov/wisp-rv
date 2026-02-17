@@ -88,3 +88,10 @@ riscv64-unknown-elf-objdump -d -M no-aliases <program>.elf
 - For wrong-path checks, use isolated 8-byte-aligned marker addresses. Avoid nearby addresses that share one 64-bit word (for example `0x130` and `0x134`) to prevent readback alias confusion.
 - The GNU assembler in this flow may reject label arithmetic directly in `addi` immediates. For hand-written assembly smoke tests, use explicit constants; for Python-built tests, prefer label/fixup generation.
 - If a small unit test includes `rv64_pkg.sv` and uses `-Wall`, add `-Wno-UNUSEDPARAM` in that unit Makefile to avoid Verilator failing on intentionally unused package constants.
+
+## Stage-08 lessons learned (keep applying)
+
+- CSR instructions that produce `rd` values behave like load results for hazards: the produced value is only available at WB in this pipeline. Stall younger consumers of that `rd` for one cycle (similar to load-use handling).
+- Trap-path tests must account for handler behavior, not just entry behavior. If the handler increments `mepc` before `mret`, expected post-trap `mepc` observations should match the resumed PC (for example trap site + 4).
+- Keep trap-vector setup robust: use label-based address generation (`la` in assembly or label fixups in Python builders) instead of brittle hard-coded offsets.
+- For illegal CSR writes, assert full trap payload correctness (`mcause=2`, `mepc` resume point, and `mtval` equal to the trapping instruction encoding), not only that a redirect occurred.

@@ -264,6 +264,16 @@ module id_control (
                     ctrl_next = '0;
                     ctrl_next.alu_op = ALU_OP_ADD;
                     ctrl_next.alu_src = ALU_SRC_REG;
+                end else if ((funct3 == F3_CSRRW) ||
+                             (funct3 == F3_CSRRS) ||
+                             (funct3 == F3_CSRRC) ||
+                             (funct3 == F3_CSRRWI) ||
+                             (funct3 == F3_CSRRSI) ||
+                             (funct3 == F3_CSRRCI)) begin
+                    ctrl_next = '0;
+                    ctrl_next.alu_op = ALU_OP_ADD;
+                    ctrl_next.alu_src = ALU_SRC_REG;
+                    ctrl_next.reg_write = 1'b1;
                 end else begin
                     valid = 1'b0;
                 end

@@ -145,11 +145,20 @@ module instr_decoder (
 
             SYSTEM: begin
                 instr_format = I_TYPE;
-                is_valid = (funct3 == F3_SYSTEM_PRIV) &&
-                           (rd == 5'd0) &&
-                           (rs1 == 5'd0) &&
-                           ((instr[31:20] == SYSTEM_IMM_ECALL) ||
-                            (instr[31:20] == SYSTEM_IMM_EBREAK));
+                if (funct3 == F3_SYSTEM_PRIV) begin
+                    is_valid = (rd == 5'd0) &&
+                               (rs1 == 5'd0) &&
+                               ((instr[31:20] == SYSTEM_IMM_ECALL) ||
+                                (instr[31:20] == SYSTEM_IMM_EBREAK) ||
+                                (instr[31:20] == SYSTEM_IMM_MRET));
+                end else begin
+                    is_valid = (funct3 == F3_CSRRW) ||
+                               (funct3 == F3_CSRRS) ||
+                               (funct3 == F3_CSRRC) ||
+                               (funct3 == F3_CSRRWI) ||
+                               (funct3 == F3_CSRRSI) ||
+                               (funct3 == F3_CSRRCI);
+                end
             end
 
             FENCE: begin

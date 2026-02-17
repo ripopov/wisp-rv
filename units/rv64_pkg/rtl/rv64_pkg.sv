@@ -59,8 +59,39 @@ package rv64_pkg;
     // SYSTEM/FENCE funct3 fields and immediate values.
     localparam logic [2:0] F3_SYSTEM_PRIV = 3'b000;
     localparam logic [2:0] F3_FENCE       = 3'b000;
+    localparam logic [2:0] F3_CSRRW       = 3'b001;
+    localparam logic [2:0] F3_CSRRS       = 3'b010;
+    localparam logic [2:0] F3_CSRRC       = 3'b011;
+    localparam logic [2:0] F3_CSRRWI      = 3'b101;
+    localparam logic [2:0] F3_CSRRSI      = 3'b110;
+    localparam logic [2:0] F3_CSRRCI      = 3'b111;
     localparam logic [11:0] SYSTEM_IMM_ECALL  = 12'h000;
     localparam logic [11:0] SYSTEM_IMM_EBREAK = 12'h001;
+    localparam logic [11:0] SYSTEM_IMM_MRET   = 12'h302;
+
+    // Trap causes used in Stage 08.
+    localparam logic [63:0] MCAUSE_ILLEGAL_INSTR = 64'd2;
+    localparam logic [63:0] MCAUSE_BREAKPOINT    = 64'd3;
+    localparam logic [63:0] MCAUSE_ECALL_MMODE   = 64'd11;
+
+    // mstatus fields used in Stage 08.
+    localparam logic [63:0] MSTATUS_MIE_MASK  = 64'h0000_0000_0000_0008;
+    localparam logic [63:0] MSTATUS_MPIE_MASK = 64'h0000_0000_0000_0080;
+    localparam logic [63:0] MSTATUS_MPP_MASK  = 64'h0000_0000_0000_1800;
+    localparam logic [63:0] MSTATUS_STAGE08_MASK = MSTATUS_MIE_MASK |
+                                                    MSTATUS_MPIE_MASK |
+                                                    MSTATUS_MPP_MASK;
+
+    // CSR command encoding used by Stage 08 commit/CSR logic.
+    typedef enum logic [2:0] {
+        CSR_CMD_NONE = 3'd0,
+        CSR_CMD_RW   = 3'd1,
+        CSR_CMD_RS   = 3'd2,
+        CSR_CMD_RC   = 3'd3,
+        CSR_CMD_RWI  = 3'd4,
+        CSR_CMD_RSI  = 3'd5,
+        CSR_CMD_RCI  = 3'd6
+    } csr_cmd_t;
 
     // ALU operation encoding, matched to units/alu/rtl/alu.sv op mapping.
     typedef enum logic [3:0] {
@@ -111,6 +142,7 @@ package rv64_pkg;
 
     typedef struct packed {
         logic [63:0] pc;
+        logic [31:0] instr;
         logic [63:0] rs1_data;
         logic [63:0] rs2_data;
         logic [63:0] imm;
@@ -120,6 +152,15 @@ package rv64_pkg;
         logic [4:0]  rs2_addr;
         logic [2:0]  funct3;
         logic [6:0]  funct7;
+        logic        is_csr;
+        csr_cmd_t    csr_cmd;
+        logic [11:0] csr_addr;
+        logic [4:0]  csr_zimm;
+        logic        csr_use_imm;
+        logic        trap_illegal;
+        logic        trap_ecall;
+        logic        trap_ebreak;
+        logic        is_mret;
         id_ctrl_t    ctrl;
         logic        valid;
     } id_ex_reg_t;
@@ -134,10 +175,19 @@ package rv64_pkg;
 
     typedef struct packed {
         logic [63:0]   pc;
+        logic [31:0]   instr;
         logic [63:0]   alu_result;
         logic [63:0]   rs2_data;
+        logic [63:0]   csr_wdata;
         logic [4:0]    rd;
         logic [2:0]    funct3;
+        logic          is_csr;
+        csr_cmd_t      csr_cmd;
+        logic [11:0]   csr_addr;
+        logic          trap_illegal;
+        logic          trap_ecall;
+        logic          trap_ebreak;
+        logic          is_mret;
         ex_mem_ctrl_t  ctrl;
         logic          branch_taken;
         logic [63:0]   branch_target;
@@ -150,9 +200,19 @@ package rv64_pkg;
     } mem_wb_ctrl_t;
 
     typedef struct packed {
+        logic [63:0]   pc;
+        logic [31:0]   instr;
         logic [63:0]   alu_result;
         logic [63:0]   mem_data;
+        logic [63:0]   csr_wdata;
         logic [4:0]    rd;
+        logic          is_csr;
+        csr_cmd_t      csr_cmd;
+        logic [11:0]   csr_addr;
+        logic          trap_illegal;
+        logic          trap_ecall;
+        logic          trap_ebreak;
+        logic          is_mret;
         mem_wb_ctrl_t  ctrl;
         logic          valid;
     } mem_wb_reg_t;

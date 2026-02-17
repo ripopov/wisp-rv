@@ -1,15 +1,17 @@
 /*
  * Module: pipeline_ctrl
  * Purpose: Global stall/flush/redirect control with load-use hazard handling.
- * Interface: EX redirect, MEM-stage stall, and load-use stall request in; per-stage stall/flush and redirect outputs out.
+ * Interface: EX and WB redirect requests plus stall requests in; per-stage stall/flush and redirect outputs out.
  * Behavior: Pure combinational control with deterministic flush-over-stall priority.
  * Reset: Not applicable (combinational module).
- * Pipeline control: Redirect flushes younger instructions, load-use inserts one EX bubble, memory stalls freeze upstream flow.
- * Corner cases: Redirect masks load-use stalls so younger work is flushed instead of held.
+ * Pipeline control: Redirects flush younger instructions, load-use inserts one EX bubble, memory stalls freeze upstream flow.
+ * Corner cases: WB redirect has priority over EX redirect and masks load-use stalls.
  */
 module pipeline_ctrl (
     input  logic        ex_redirect_valid,
     input  logic [63:0] ex_redirect_pc,
+    input  logic        wb_redirect_valid,
+    input  logic [63:0] wb_redirect_pc,
     input  logic        mem_stall,
     input  logic        load_use_stall,
 
@@ -28,8 +30,10 @@ module pipeline_ctrl (
     output logic [63:0] redirect_pc
 );
     logic load_use_stall_effective;
+    logic redirect_any;
 
-    assign load_use_stall_effective = load_use_stall && !ex_redirect_valid;
+    assign redirect_any = wb_redirect_valid || ex_redirect_valid;
+    assign load_use_stall_effective = load_use_stall && !redirect_any;
 
     always_comb begin
         if_stage_stall = 1'b0;
@@ -43,8 +47,16 @@ module pipeline_ctrl (
         mem_wb_stall = 1'b0;
         mem_wb_flush = 1'b0;
 
-        redirect_valid = ex_redirect_valid;
-        redirect_pc = ex_redirect_pc;
+        redirect_valid = 1'b0;
+        redirect_pc = 64'd0;
+
+        if (wb_redirect_valid) begin
+            redirect_valid = 1'b1;
+            redirect_pc = wb_redirect_pc;
+        end else if (ex_redirect_valid) begin
+            redirect_valid = 1'b1;
+            redirect_pc = ex_redirect_pc;
+        end
 
         if (mem_stall) begin
             if_stage_stall = 1'b1;
@@ -61,6 +73,14 @@ module pipeline_ctrl (
             if_stage_flush = 1'b1;
             if_id_flush = 1'b1;
             id_ex_flush = 1'b1;
+        end
+
+        if (wb_redirect_valid) begin
+            if_stage_flush = 1'b1;
+            if_id_flush = 1'b1;
+            id_ex_flush = 1'b1;
+            ex_mem_flush = 1'b1;
+            mem_wb_flush = 1'b1;
         end
     end
 endmodule

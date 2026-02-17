@@ -213,7 +213,11 @@ def model_ctrl(opcode: int, funct3: int, funct7: int) -> tuple[int, ...]:
             valid = False
 
     elif opcode == SYSTEM:
-        if funct3 != 0b000:
+        if funct3 == 0b000:
+            pass
+        elif funct3 in (0b001, 0b010, 0b011, 0b101, 0b110, 0b111):
+            ctrl[4] = 1
+        else:
             valid = False
 
     elif opcode == FENCE:
@@ -487,6 +491,13 @@ async def test_directed_control_decode(dut):
             ctrl_tuple(alu_op=ALU_ADD, alu_src=SRC_IMM, reg_write=1, jump=1),
         ),
         ("ECALL_EBREAK_CLASS", SYSTEM, 0b000, 0b0000000, ctrl_tuple()),
+        (
+            "CSRRW_CLASS",
+            SYSTEM,
+            0b001,
+            0b0000000,
+            ctrl_tuple(alu_op=ALU_ADD, alu_src=SRC_REG, reg_write=1),
+        ),
         ("FENCE_NOP", FENCE, 0b000, 0, ctrl_tuple()),
     ]
 
@@ -506,7 +517,7 @@ async def test_invalid_combinations_zero_controls(dut):
         ("STORE_BAD_FUNCT3", STORE, 0b100, 0),
         ("BRANCH_BAD_FUNCT3", BRANCH, 0b010, 0),
         ("JALR_BAD_FUNCT3", JALR, 0b001, 0),
-        ("SYSTEM_BAD_FUNCT3", SYSTEM, 0b001, 0),
+        ("SYSTEM_BAD_FUNCT3", SYSTEM, 0b100, 0),
         ("FENCE_BAD_FUNCT3", FENCE, 0b001, 0),
     ]
 

@@ -10,6 +10,20 @@ from cocotb.triggers import ClockCycles, ReadWrite, RisingEdge, Timer
 MASK64 = (1 << 64) - 1
 NOP = 0x00000013
 TOHOST_ADDR = 0x200
+SYSTEM = 0b1110011
+AFTER_ILLEGAL_PC = 0x58
+AFTER_ECALL_PC = 0x74
+AFTER_RO_WRITE_PC = 0xA8
+
+
+def enc_i(imm12: int, rs1: int, funct3: int, rd: int, opcode: int) -> int:
+    return (
+        ((imm12 & 0xFFF) << 20)
+        | ((rs1 & 0x1F) << 15)
+        | ((funct3 & 0x7) << 12)
+        | ((rd & 0x1F) << 7)
+        | (opcode & 0x7F)
+    )
 
 
 def read_u64(memory: dict[int, int], addr: int) -> int:
@@ -43,19 +57,19 @@ def build_program() -> dict[int, int]:
     tools = require_toolchain()
 
     root = Path(__file__).resolve().parent
-    src = root / "programs" / "stage7_smoke.S"
+    src = root / "programs" / "stage8_smoke.S"
     linker = root / "linker.ld"
 
-    with tempfile.TemporaryDirectory(prefix="wisp-rv64-stage7-") as tmpdir:
+    with tempfile.TemporaryDirectory(prefix="wisp-rv64-stage8-") as tmpdir:
         out = Path(tmpdir)
-        elf = out / "stage7_smoke.elf"
-        bin_path = out / "stage7_smoke.bin"
-        map_path = out / "stage7_smoke.map"
-        dump_path = out / "stage7_smoke.dump"
+        elf = out / "stage8_smoke.elf"
+        bin_path = out / "stage8_smoke.bin"
+        map_path = out / "stage8_smoke.map"
+        dump_path = out / "stage8_smoke.dump"
 
         gcc_cmd = [
             tools["riscv64-unknown-elf-gcc"],
-            "-march=rv64i",
+            "-march=rv64i_zicsr",
             "-mabi=lp64",
             "-ffreestanding",
             "-nostdlib",
@@ -110,7 +124,7 @@ async def reset_dut(dut, cycles: int = 5) -> None:
 
 
 @cocotb.test()
-async def test_stage7_program_end_to_end(dut):
+async def test_stage8_program_end_to_end(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset_dut(dut)
 
@@ -165,14 +179,30 @@ async def test_stage7_program_end_to_end(dut):
 
     assert read_u64(dmem, TOHOST_ADDR) == 1
     assert read_u64(dmem, 0x100) == 15
-    assert read_u64(dmem, 0x108) == 16
-    assert read_u64(dmem, 0x110) == 17
-    assert read_u64(dmem, 0x118) == 10
-    assert read_u64(dmem, 0x120) == 0x44
-    assert read_u64(dmem, 0x128) == 0x45
-    assert read_u64(dmem, 0x130) == 42
+    assert read_u64(dmem, 0x108) == 0
+    assert read_u64(dmem, 0x110) == 0x8
+    assert read_u64(dmem, 0x118) == 0
+    assert read_u64(dmem, 0x120) == 0x80
+    assert read_u64(dmem, 0x128) == 0x80
+
+    assert read_u64(dmem, 0x130) == 2
+    assert read_u64(dmem, 0x138) == AFTER_ILLEGAL_PC
+    assert read_u64(dmem, 0x140) == 0
+
+    assert read_u64(dmem, 0x148) == 11
+    assert read_u64(dmem, 0x150) == AFTER_ECALL_PC
     assert read_u64(dmem, 0x158) == 0
-    assert read_u64(dmem, 0x138) == 0x33
-    assert read_u64(dmem, 0x140) != 0
-    assert read_u64(dmem, 0x148) == 0x1234_5678
-    assert read_u64(dmem, 0x150) == 0
+    assert read_u64(dmem, 0x160) == 2
+
+    mcycle = read_u64(dmem, 0x168)
+    minstret = read_u64(dmem, 0x170)
+    assert mcycle > 0
+    assert minstret > 0
+    assert mcycle >= minstret
+
+    # ro_write_site: csrrw x19, mvendorid, x1
+    expected_ro_write_mtval = enc_i(0xF11, 1, 0b001, 19, SYSTEM)
+    assert read_u64(dmem, 0x178) == 2
+    assert read_u64(dmem, 0x180) == AFTER_RO_WRITE_PC
+    assert read_u64(dmem, 0x188) == expected_ro_write_mtval
+    assert read_u64(dmem, 0x190) == 3

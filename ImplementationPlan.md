@@ -1,6 +1,6 @@
 # Implementation Plan: Pipelined RV64 Processor
 
-Current implementation stage: **Stage 08 - CSR, exceptions, and interrupts**.
+Current implementation stage: **Stage 09 - M extension (multiply/divide)**.
 
 Assumption: all lower-numbered stages are fully implemented, all tests pass, and changes are merged before work begins on the current stage.
 
@@ -318,8 +318,8 @@ A bubble (invalid instruction) is represented by deasserting the stage's `valid`
 - [x] Stage 05 - Memory stage and load/store unit
 - [x] Stage 06 - Core top-level integration (pipeline v1)
 - [x] Stage 07 - Forwarding and hazard control completion
-- [ ] Stage 08 - CSR, exceptions, and interrupts  <-- current
-- [ ] Stage 09 - M extension (multiply/divide)
+- [x] Stage 08 - CSR, exceptions, and interrupts
+- [ ] Stage 09 - M extension (multiply/divide)  <-- current
 - [ ] Stage 10 - Memory subsystem integration
 - [ ] Stage 11 - Integration program build pipeline (real compiler)
 - [ ] Stage 12 - Full-system functional validation

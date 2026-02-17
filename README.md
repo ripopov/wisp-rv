@@ -92,6 +92,15 @@ RV64 RISC-V core project in SystemVerilog with unit tests in Python (cocotb) and
 - Pipeline control (v2)
   - RTL: `units/pipeline_ctrl/rtl/pipeline_ctrl.sv`
   - Testbench: `units/pipeline_ctrl/tb/test_pipeline_ctrl.py`
+- CSR file
+  - RTL: `units/csr_file/rtl/csr_file.sv`
+  - Testbench: `units/csr_file/tb/test_csr_file.py`
+- Trap control
+  - RTL: `units/trap_ctrl/rtl/trap_ctrl.sv`
+  - Testbench: `units/trap_ctrl/tb/test_trap_ctrl.py`
+- Commit control
+  - RTL: `units/commit_ctrl/rtl/commit_ctrl.sv`
+  - Testbench: `units/commit_ctrl/tb/test_commit_ctrl.py`
 - Core top-level integration (v2)
   - RTL: `units/core_top/rtl/core_top.sv`
   - Testbench: `units/core_top/tb/test_core_top.py`
@@ -115,4 +124,10 @@ Run all unit tests:
 for dir in units/*/; do
   [ -f "$dir/Makefile" ] && PATH="$(pwd)/.venv/bin:$PATH" make -C "$dir" SIM=verilator
 done
+```
+
+Run integration tests:
+
+```bash
+PATH="$(pwd)/.venv/bin:$PATH" make -C tests/integration SIM=verilator
 ```

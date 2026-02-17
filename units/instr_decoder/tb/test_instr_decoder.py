@@ -157,7 +157,10 @@ def model_decode(instr: int) -> tuple[int, int]:
         valid = funct3 == 0b000
     elif opcode == SYSTEM:
         fmt = FMT_I
-        valid = funct3 == 0b000 and rd == 0 and rs1 == 0 and imm12 in (0x000, 0x001)
+        if funct3 == 0b000:
+            valid = rd == 0 and rs1 == 0 and imm12 in (0x000, 0x001, 0x302)
+        else:
+            valid = funct3 in (0b001, 0b010, 0b011, 0b101, 0b110, 0b111)
     elif opcode == FENCE:
         fmt = FMT_I
         valid = funct3 == 0b000
@@ -256,6 +259,13 @@ async def test_decode_all_rv64i_encodings(dut):
         ("JALR", enc_i(0x024, 8, 0b000, 7, JALR), FMT_I),
         ("ECALL", 0x00000073, FMT_I),
         ("EBREAK", 0x00100073, FMT_I),
+        ("MRET", 0x30200073, FMT_I),
+        ("CSRRW", enc_i(0x300, 8, 0b001, 7, SYSTEM), FMT_I),
+        ("CSRRS", enc_i(0x341, 8, 0b010, 7, SYSTEM), FMT_I),
+        ("CSRRC", enc_i(0x342, 8, 0b011, 7, SYSTEM), FMT_I),
+        ("CSRRWI", enc_i(0x305, 0x1F, 0b101, 7, SYSTEM), FMT_I),
+        ("CSRRSI", enc_i(0x304, 0x01, 0b110, 7, SYSTEM), FMT_I),
+        ("CSRRCI", enc_i(0x343, 0x1F, 0b111, 7, SYSTEM), FMT_I),
         ("FENCE", enc_i(0x033, 0, 0b000, 0, FENCE), FMT_I),
     ]
 
@@ -283,6 +293,8 @@ async def test_illegal_instruction_detection(dut):
         ("JALR_BAD_FUNCT3", enc_i(0x10, 8, 0b001, 7, JALR)),
         ("SYSTEM_BAD_IMM", enc_i(0x002, 0, 0b000, 0, SYSTEM)),
         ("SYSTEM_BAD_RD", enc_i(0x000, 0, 0b000, 1, SYSTEM)),
+        ("SYSTEM_BAD_RS1", enc_i(0x001, 1, 0b000, 0, SYSTEM)),
+        ("SYSTEM_BAD_FUNCT3", enc_i(0x300, 1, 0b100, 1, SYSTEM)),
         ("FENCE_I_NOT_SUPPORTED", enc_i(0x000, 0, 0b001, 0, FENCE)),
     ]
 
