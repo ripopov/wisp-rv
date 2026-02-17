@@ -1,6 +1,6 @@
 # Implementation Plan: Pipelined RV64 Processor
 
-Current implementation stage: **Stage 06 - Core top-level integration (pipeline v1)**.
+Current implementation stage: **Stage 07 - Forwarding and hazard control completion**.
 
 Assumption: all lower-numbered stages are fully implemented, all tests pass, and changes are merged before work begins on the current stage.
 
@@ -316,8 +316,8 @@ A bubble (invalid instruction) is represented by deasserting the stage's `valid`
 - [x] Stage 03 - Instruction fetch stage
 - [x] Stage 04 - Execute stage and branch/jump control
 - [x] Stage 05 - Memory stage and load/store unit
-- [ ] Stage 06 - Core top-level integration (pipeline v1)  <-- current
-- [ ] Stage 07 - Forwarding and hazard control completion
+- [x] Stage 06 - Core top-level integration (pipeline v1)
+- [ ] Stage 07 - Forwarding and hazard control completion  <-- current
 - [ ] Stage 08 - CSR, exceptions, and interrupts
 - [ ] Stage 09 - M extension (multiply/divide)
 - [ ] Stage 10 - Memory subsystem integration

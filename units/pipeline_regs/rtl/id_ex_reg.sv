@@ -16,6 +16,7 @@ module id_ex_reg (
     input  logic [63:0] rs1_data_in,
     input  logic [63:0] rs2_data_in,
     input  logic [63:0] imm_in,
+    input  logic [6:0]  opcode_in,
     input  logic [4:0]  rd_in,
     input  logic [4:0]  rs1_addr_in,
     input  logic [4:0]  rs2_addr_in,
@@ -35,6 +36,7 @@ module id_ex_reg (
     output logic [63:0] rs1_data_out,
     output logic [63:0] rs2_data_out,
     output logic [63:0] imm_out,
+    output logic [6:0]  opcode_out,
     output logic [4:0]  rd_out,
     output logic [4:0]  rs1_addr_out,
     output logic [4:0]  rs2_addr_out,
@@ -62,6 +64,7 @@ module id_ex_reg (
         in_data.rs1_data = rs1_data_in;
         in_data.rs2_data = rs2_data_in;
         in_data.imm = imm_in;
+        in_data.opcode = opcode_in;
         in_data.rd = rd_in;
         in_data.rs1_addr = rs1_addr_in;
         in_data.rs2_addr = rs2_addr_in;
@@ -91,6 +94,7 @@ module id_ex_reg (
     assign rs1_data_out = reg_q.rs1_data;
     assign rs2_data_out = reg_q.rs2_data;
     assign imm_out = reg_q.imm;
+    assign opcode_out = reg_q.opcode;
     assign rd_out = reg_q.rd;
     assign rs1_addr_out = reg_q.rs1_addr;
     assign rs2_addr_out = reg_q.rs2_addr;

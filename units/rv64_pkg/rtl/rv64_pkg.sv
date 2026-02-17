@@ -114,6 +114,7 @@ package rv64_pkg;
         logic [63:0] rs1_data;
         logic [63:0] rs2_data;
         logic [63:0] imm;
+        logic [6:0]  opcode;
         logic [4:0]  rd;
         logic [4:0]  rs1_addr;
         logic [4:0]  rs2_addr;

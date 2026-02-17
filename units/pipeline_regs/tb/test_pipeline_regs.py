@@ -16,6 +16,7 @@ FIELD_WIDTHS = {
         "rs1_data": 64,
         "rs2_data": 64,
         "imm": 64,
+        "opcode": 7,
         "rd": 5,
         "rs1_addr": 5,
         "rs2_addr": 5,
