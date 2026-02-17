@@ -27,10 +27,23 @@ RV64 RISC-V core project in SystemVerilog with unit tests in Python (cocotb) and
 - `units/<unit-name>/Makefile`: simulation entrypoint for that unit
 - `tests/integration`: top-level CPU + memory subsystem end-to-end tests
 
-## First implemented unit: ALU
+## Implemented units
 
-- RTL: `units/alu/rtl/alu.sv`
-- Testbench: `units/alu/tb/test_alu.py`
+- ALU
+  - RTL: `units/alu/rtl/alu.sv`
+  - Testbench: `units/alu/tb/test_alu.py`
+- RV64 ISA package (shared constants/types)
+  - RTL: `units/rv64_pkg/rtl/rv64_pkg.sv`
+  - Sanity testbench: `units/rv64_pkg/tb/test_rv64_pkg.py`
+- Instruction decoder
+  - RTL: `units/instr_decoder/rtl/instr_decoder.sv`
+  - Testbench: `units/instr_decoder/tb/test_instr_decoder.py`
+- Immediate generator
+  - RTL: `units/imm_gen/rtl/imm_gen.sv`
+  - Testbench: `units/imm_gen/tb/test_imm_gen.py`
+- ID control decoder
+  - RTL: `units/id_control/rtl/id_control.sv`
+  - Testbench: `units/id_control/tb/test_id_control.py`
 
 Setup Python dependencies (Python 3.13+):
 
@@ -39,8 +52,16 @@ python3.13 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 ```
 
-Run the ALU test:
+Run a single unit test:
 
 ```bash
 PATH="$(pwd)/.venv/bin:$PATH" make -C units/alu SIM=verilator
+```
+
+Run all unit tests:
+
+```bash
+for dir in units/*/; do
+  [ -f "$dir/Makefile" ] && PATH="$(pwd)/.venv/bin:$PATH" make -C "$dir" SIM=verilator
+done
 ```
