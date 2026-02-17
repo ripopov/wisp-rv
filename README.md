@@ -89,6 +89,15 @@ RV64 RISC-V core project in SystemVerilog with unit tests in Python (cocotb) and
 - Hazard unit
   - RTL: `units/hazard_unit/rtl/hazard_unit.sv`
   - Testbench: `units/hazard_unit/tb/test_hazard_unit.py`
+- Multiply unit
+  - RTL: `units/mul_unit/rtl/mul_unit.sv`
+  - Testbench: `units/mul_unit/tb/test_mul_unit.py`
+- Divide/remainder unit
+  - RTL: `units/div_unit/rtl/div_unit.sv`
+  - Testbench: `units/div_unit/tb/test_div_unit.py`
+- M-extension control
+  - RTL: `units/m_ext_ctrl/rtl/m_ext_ctrl.sv`
+  - Testbench: `units/m_ext_ctrl/tb/test_m_ext_ctrl.py`
 - Pipeline control (v2)
   - RTL: `units/pipeline_ctrl/rtl/pipeline_ctrl.sv`
   - Testbench: `units/pipeline_ctrl/tb/test_pipeline_ctrl.py`
@@ -104,6 +113,12 @@ RV64 RISC-V core project in SystemVerilog with unit tests in Python (cocotb) and
 - Core top-level integration (v2)
   - RTL: `units/core_top/rtl/core_top.sv`
   - Testbench: `units/core_top/tb/test_core_top.py`
+- RAM model
+  - RTL: `units/ram_model/rtl/ram_model.sv`
+  - Testbench: `units/ram_model/tb/test_ram_model.py`
+- Memory subsystem integration top
+  - RTL: `units/memory_subsystem/rtl/memory_subsystem.sv`
+  - Testbench: `units/memory_subsystem/tb/test_memory_subsystem.py`
 
 Setup Python dependencies (Python 3.13+):
 

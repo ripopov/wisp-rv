@@ -34,7 +34,9 @@ VERILOG_SOURCES += $(PWD)/../../units/trap_ctrl/rtl/trap_ctrl.sv
 VERILOG_SOURCES += $(PWD)/../../units/commit_ctrl/rtl/commit_ctrl.sv
 VERILOG_SOURCES += $(PWD)/../../units/pipeline_ctrl/rtl/pipeline_ctrl.sv
 VERILOG_SOURCES += $(PWD)/../../units/core_top/rtl/core_top.sv
-COCOTB_TOPLEVEL := core_top
+VERILOG_SOURCES += $(PWD)/../../units/ram_model/rtl/ram_model.sv
+VERILOG_SOURCES += $(PWD)/../../units/memory_subsystem/rtl/memory_subsystem.sv
+COCOTB_TOPLEVEL := memory_subsystem
 COCOTB_TEST_MODULES := test_core_top_integration
 export PYTHONPATH := $(PWD):$(PYTHONPATH)
 

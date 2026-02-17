@@ -5,10 +5,9 @@ from pathlib import Path
 
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import ClockCycles, ReadWrite, RisingEdge, Timer
+from cocotb.triggers import ClockCycles, RisingEdge, Timer
 
 MASK64 = (1 << 64) - 1
-NOP = 0x00000013
 TOHOST_ADDR = 0x200
 SYSTEM = 0b1110011
 AFTER_ILLEGAL_PC = 0x58
@@ -26,17 +25,65 @@ def enc_i(imm12: int, rs1: int, funct3: int, rd: int, opcode: int) -> int:
     )
 
 
-def read_u64(memory: dict[int, int], addr: int) -> int:
-    value = 0
-    for i in range(8):
-        value |= (memory.get(addr + i, 0) & 0xFF) << (8 * i)
-    return value & MASK64
+def init_tb_ports(dut) -> None:
+    dut.tb_mem_wr_en.value = 0
+    dut.tb_mem_is_data.value = 1
+    dut.tb_mem_wr_addr.value = 0
+    dut.tb_mem_wr_data.value = 0
+    dut.tb_mem_wr_be.value = 0
+    dut.tb_mem_rd_addr.value = 0
 
 
-def write_u64(memory: dict[int, int], addr: int, wdata: int, byte_en: int) -> None:
-    for i in range(8):
-        if (byte_en >> i) & 1:
-            memory[addr + i] = (wdata >> (8 * i)) & 0xFF
+async def tb_write_word(
+    dut,
+    word_idx: int,
+    value: int,
+    be: int = 0xFF,
+    *,
+    is_data: bool = True,
+) -> None:
+    dut.tb_mem_is_data.value = 1 if is_data else 0
+    dut.tb_mem_wr_addr.value = (word_idx << 3) & MASK64
+    dut.tb_mem_wr_data.value = value & MASK64
+    dut.tb_mem_wr_be.value = be & 0xFF
+    dut.tb_mem_wr_en.value = 1
+    await RisingEdge(dut.clk)
+    dut.tb_mem_wr_en.value = 0
+
+
+async def tb_read_word(dut, word_idx: int, *, is_data: bool = True) -> int:
+    dut.tb_mem_is_data.value = 1 if is_data else 0
+    dut.tb_mem_rd_addr.value = (word_idx << 3) & MASK64
+    await Timer(1, unit="ns")
+    return int(dut.tb_mem_rd_data.value) & MASK64
+
+
+async def tb_read_u64(dut, addr: int, *, is_data: bool = True) -> int:
+    assert (addr & 0x7) == 0
+    return await tb_read_word(dut, addr >> 3, is_data=is_data)
+
+
+async def write_instr_u32(dut, byte_addr: int, instr: int) -> None:
+    word_idx = byte_addr >> 3
+    lane = (byte_addr >> 2) & 0x1
+    if lane == 0:
+        wdata = instr & 0xFFFF_FFFF
+        be = 0x0F
+    else:
+        wdata = (instr & 0xFFFF_FFFF) << 32
+        be = 0xF0
+    await tb_write_word(dut, word_idx, wdata, be, is_data=False)
+
+
+async def clear_ram_prefix(dut, words: int = 512) -> None:
+    for idx in range(words):
+        await tb_write_word(dut, idx, 0, 0xFF, is_data=False)
+        await tb_write_word(dut, idx, 0, 0xFF, is_data=True)
+
+
+async def load_program_into_ram(dut, program_words: dict[int, int]) -> None:
+    for word_idx, instr in program_words.items():
+        await write_instr_u32(dut, word_idx * 4, instr)
 
 
 def require_toolchain() -> dict[str, str]:
@@ -112,117 +159,142 @@ def build_program() -> dict[int, int]:
     return words
 
 
-async def reset_dut(dut, cycles: int = 5) -> None:
+async def reset_dut_with_program(
+    dut, program_words: dict[int, int], cycles: int = 2
+) -> None:
     dut.rst.value = 1
-    dut.imem_ready.value = 1
-    dut.imem_rdata.value = NOP
-    dut.dmem_ready.value = 1
-    dut.dmem_rdata.value = 0
+    await ClockCycles(dut.clk, cycles)
+    await clear_ram_prefix(dut)
+    await load_program_into_ram(dut, program_words)
     await ClockCycles(dut.clk, cycles)
     dut.rst.value = 0
     await RisingEdge(dut.clk)
 
 
-@cocotb.test()
-async def test_stage9_program_end_to_end(dut):
-    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
-    await reset_dut(dut)
-
-    imem = build_program()
-    dmem: dict[int, int] = {}
-
+async def run_until_completion(dut, *, max_cycles: int) -> None:
     tohost_seen = False
     drain_cycles = 0
+    recent_pcs: list[int] = []
 
-    max_cycles = 10_000
-    for cycle in range(max_cycles):
-        await ReadWrite()
-
-        imem_word_addr = (int(dut.imem_addr.value) & MASK64) >> 2
-        dut.imem_ready.value = 1
-        dut.imem_rdata.value = imem.get(imem_word_addr, NOP)
-
-        if int(dut.dmem_req.value):
-            dut.dmem_ready.value = 0 if (cycle % 5 == 2) else 1
-        else:
-            dut.dmem_ready.value = 1
-
-        dmem_addr_aligned = (int(dut.dmem_addr.value) & MASK64) & ~0x7
-        dut.dmem_rdata.value = read_u64(dmem, dmem_addr_aligned)
-
-        await Timer(1, unit="ns")
-
-        dmem_req = int(dut.dmem_req.value)
-        dmem_we = int(dut.dmem_we.value)
-        dmem_ready = int(dut.dmem_ready.value)
-
-        if dmem_req and dmem_ready and dmem_we:
-            addr_aligned = (int(dut.dmem_addr.value) & MASK64) & ~0x7
-            wdata = int(dut.dmem_wdata.value) & MASK64
-            byte_en = int(dut.dmem_byte_en.value) & 0xFF
-            write_u64(dmem, addr_aligned, wdata, byte_en)
-
-            if (addr_aligned <= TOHOST_ADDR <= addr_aligned + 7) and (
-                read_u64(dmem, TOHOST_ADDR) != 0
-            ):
-                tohost_seen = True
-                drain_cycles = 8
-
+    for _ in range(max_cycles):
         await RisingEdge(dut.clk)
+
+        recent_pcs.append(int(dut.dbg_if_pc.value) & MASK64)
+        if len(recent_pcs) > 24:
+            recent_pcs.pop(0)
+
+        if (await tb_read_u64(dut, TOHOST_ADDR)) != 0 and not tohost_seen:
+            tohost_seen = True
+            drain_cycles = 8
 
         if tohost_seen:
             drain_cycles -= 1
             if drain_cycles == 0:
-                break
-    else:
-        raise AssertionError("Program did not complete before timeout")
+                return
 
-    assert read_u64(dmem, TOHOST_ADDR) == 1
-    assert read_u64(dmem, 0x100) == 15
-    assert read_u64(dmem, 0x108) == 0
-    assert read_u64(dmem, 0x110) == 0x8
-    assert read_u64(dmem, 0x118) == 0
-    assert read_u64(dmem, 0x120) == 0x80
-    assert read_u64(dmem, 0x128) == 0x80
+    raise AssertionError(
+        "Program did not complete before timeout"
+        f"; recent_pcs={[hex(pc) for pc in recent_pcs]}"
+    )
 
-    assert read_u64(dmem, 0x130) == 2
-    assert read_u64(dmem, 0x138) == AFTER_ILLEGAL_PC
-    assert read_u64(dmem, 0x140) == 0
 
-    assert read_u64(dmem, 0x148) == 11
-    assert read_u64(dmem, 0x150) == AFTER_ECALL_PC
-    assert read_u64(dmem, 0x158) == 0
-    assert read_u64(dmem, 0x160) == 2
+@cocotb.test()
+async def test_stage9_program_end_to_end(dut):
+    init_tb_ports(dut)
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
 
-    mcycle = read_u64(dmem, 0x168)
-    minstret = read_u64(dmem, 0x170)
+    program_words = build_program()
+    await reset_dut_with_program(dut, program_words)
+    await run_until_completion(dut, max_cycles=25_000)
+
+    observed = {}
+    for addr in (
+        TOHOST_ADDR,
+        0x100,
+        0x108,
+        0x110,
+        0x118,
+        0x120,
+        0x128,
+        0x130,
+        0x138,
+        0x140,
+        0x148,
+        0x150,
+        0x158,
+        0x160,
+        0x168,
+        0x170,
+        0x178,
+        0x180,
+        0x188,
+        0x190,
+        0x198,
+        0x1A0,
+        0x1A8,
+        0x1B0,
+        0x1B8,
+        0x1C0,
+        0x1C8,
+        0x1D0,
+        0x1D8,
+        0x1E0,
+        0x1E8,
+        0x1F0,
+        0x1F8,
+        0x210,
+        0x218,
+        0x220,
+        0x228,
+        0x230,
+    ):
+        observed[addr] = await tb_read_u64(dut, addr)
+
+    assert observed[TOHOST_ADDR] == 1
+    assert observed[0x100] == 15
+    assert observed[0x108] == 0
+    assert observed[0x110] == 0x8
+    assert observed[0x118] == 0
+    assert observed[0x120] == 0x80
+    assert observed[0x128] == 0x80
+
+    assert observed[0x130] == 2
+    assert observed[0x138] == AFTER_ILLEGAL_PC
+    assert observed[0x140] == 0
+
+    assert observed[0x148] == 11
+    assert observed[0x150] == AFTER_ECALL_PC
+    assert observed[0x158] == 0
+    assert observed[0x160] == 2
+
+    mcycle = observed[0x168]
+    minstret = observed[0x170]
     assert mcycle > 0
     assert minstret > 0
     assert mcycle >= minstret
 
-    # ro_write_site: csrrw x19, mvendorid, x1
     expected_ro_write_mtval = enc_i(0xF11, 1, 0b001, 19, SYSTEM)
-    assert read_u64(dmem, 0x178) == 2
-    assert read_u64(dmem, 0x180) == AFTER_RO_WRITE_PC
-    assert read_u64(dmem, 0x188) == expected_ro_write_mtval
-    assert read_u64(dmem, 0x190) == 3
+    assert observed[0x178] == 2
+    assert observed[0x180] == AFTER_RO_WRITE_PC
+    assert observed[0x188] == expected_ro_write_mtval
+    assert observed[0x190] == 3
 
-    assert read_u64(dmem, 0x198) == 42
-    assert read_u64(dmem, 0x1A0) == 0xFFFF_FFFF_FFFF_FFFF
-    assert read_u64(dmem, 0x1A8) == 0xFFFF_FFFF_FFFF_FFFF
-    assert read_u64(dmem, 0x1B0) == 1
-    assert read_u64(dmem, 0x1B8) == 0xFFFF_FFFF_FFFF_FFFE
+    assert observed[0x198] == 42
+    assert observed[0x1A0] == 0xFFFF_FFFF_FFFF_FFFF
+    assert observed[0x1A8] == 0xFFFF_FFFF_FFFF_FFFF
+    assert observed[0x1B0] == 1
+    assert observed[0x1B8] == 0xFFFF_FFFF_FFFF_FFFE
 
-    assert read_u64(dmem, 0x1C0) == 14
-    assert read_u64(dmem, 0x1C8) == 0xFFFF_FFFF_FFFF_FFFF
-    assert read_u64(dmem, 0x1D0) == 0x8000_0000_0000_0000
-    assert read_u64(dmem, 0x1D8) == 0x5555_5555_5555_5555
-    assert read_u64(dmem, 0x1E0) == 0xFFFF_FFFF_FFFF_FFFF
-    assert read_u64(dmem, 0x1E8) == 0
-    assert read_u64(dmem, 0x1F0) == 0xFFFF_FFFF_FFFF_FFFC
-    assert read_u64(dmem, 0x1F8) == 0x0000_0000_5555_5554
-    assert read_u64(dmem, 0x210) == 0xFFFF_FFFF_FFFF_FFFF
-    assert read_u64(dmem, 0x218) == 0xFFFF_FFFF_FFFF_FFFF
-    assert read_u64(dmem, 0x220) == 2
-    assert read_u64(dmem, 0x228) == 0xFFFF_FFFF_FFFF_FFFE
-    assert read_u64(dmem, 0x230) == 15
+    assert observed[0x1C0] == 14
+    assert observed[0x1C8] == 0xFFFF_FFFF_FFFF_FFFF
+    assert observed[0x1D0] == 0x8000_0000_0000_0000
+    assert observed[0x1D8] == 0x5555_5555_5555_5555
+    assert observed[0x1E0] == 0xFFFF_FFFF_FFFF_FFFF
+    assert observed[0x1E8] == 0
+    assert observed[0x1F0] == 0xFFFF_FFFF_FFFF_FFFC
+    assert observed[0x1F8] == 0x0000_0000_5555_5554
+    assert observed[0x210] == 0xFFFF_FFFF_FFFF_FFFF
+    assert observed[0x218] == 0xFFFF_FFFF_FFFF_FFFF
+    assert observed[0x220] == 2
+    assert observed[0x228] == 0xFFFF_FFFF_FFFF_FFFE
+    assert observed[0x230] == 15

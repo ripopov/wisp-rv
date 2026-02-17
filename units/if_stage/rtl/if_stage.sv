@@ -34,7 +34,7 @@ module if_stage #(
     logic        fetch_instr_valid;
 
     assign hold_pc = stall || !imem_ready;
-    assign fetch_req = !stall && imem_ready;
+    assign fetch_req = !stall;
 
     pc_select u_pc_select (
         .current_pc(pc_q),

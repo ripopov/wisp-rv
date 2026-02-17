@@ -37,11 +37,11 @@ def expected_fetch_outputs(
     imem_ready: int,
     imem_rdata: int,
 ) -> tuple[int, int, int, int]:
-    fetch_req = 1 if (not stall and imem_ready) else 0
+    fetch_req = 1 if (not stall) else 0
     imem_req = fetch_req
     imem_addr = current_pc & MASK64
     instr = NOP_INSTR if flush else (imem_rdata & 0xFFFF_FFFF)
-    instr_valid = 0 if flush else fetch_req
+    instr_valid = 0 if flush else (fetch_req and imem_ready)
     return imem_req, imem_addr, instr, instr_valid
 
 
