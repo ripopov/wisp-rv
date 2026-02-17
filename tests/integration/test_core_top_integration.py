@@ -1,11 +1,19 @@
-import shutil
-import subprocess
-import tempfile
 from pathlib import Path
+import sys
 
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import ClockCycles, RisingEdge, Timer
+
+THIS_DIR = Path(__file__).resolve().parent
+if str(THIS_DIR) not in sys.path:
+    sys.path.insert(0, str(THIS_DIR))
+
+from utils.build_rv64_program import (
+    DEFAULT_MABI,
+    DEFAULT_MARCH,
+    build_rv64_program_u32_words,
+)
 
 MASK64 = (1 << 64) - 1
 TOHOST_ADDR = 0x200
@@ -86,77 +94,16 @@ async def load_program_into_ram(dut, program_words: dict[int, int]) -> None:
         await write_instr_u32(dut, word_idx * 4, instr)
 
 
-def require_toolchain() -> dict[str, str]:
-    tools = {}
-    for tool in (
-        "riscv64-unknown-elf-gcc",
-        "riscv64-unknown-elf-objcopy",
-        "riscv64-unknown-elf-objdump",
-    ):
-        path = shutil.which(tool)
-        if path is None:
-            raise RuntimeError(f"Missing required toolchain binary: {tool}")
-        tools[tool] = path
-    return tools
-
-
 def build_program() -> dict[int, int]:
-    tools = require_toolchain()
-
     root = Path(__file__).resolve().parent
     src = root / "programs" / "stage9_smoke.S"
-    linker = root / "linker.ld"
-
-    with tempfile.TemporaryDirectory(prefix="wisp-rv64-stage9-") as tmpdir:
-        out = Path(tmpdir)
-        elf = out / "stage9_smoke.elf"
-        bin_path = out / "stage9_smoke.bin"
-        map_path = out / "stage9_smoke.map"
-        dump_path = out / "stage9_smoke.dump"
-
-        gcc_cmd = [
-            tools["riscv64-unknown-elf-gcc"],
-            "-march=rv64im_zicsr",
-            "-mabi=lp64",
-            "-ffreestanding",
-            "-nostdlib",
-            "-nostartfiles",
-            "-T",
-            str(linker),
-            f"-Wl,-Map,{map_path}",
-            "-o",
-            str(elf),
-            str(src),
-        ]
-        subprocess.run(gcc_cmd, check=True, capture_output=True, text=True)
-
-        objcopy_cmd = [
-            tools["riscv64-unknown-elf-objcopy"],
-            "-O",
-            "binary",
-            str(elf),
-            str(bin_path),
-        ]
-        subprocess.run(objcopy_cmd, check=True, capture_output=True, text=True)
-
-        objdump_cmd = [
-            tools["riscv64-unknown-elf-objdump"],
-            "-d",
-            "-M",
-            "no-aliases",
-            str(elf),
-        ]
-        dump = subprocess.run(objdump_cmd, check=True, capture_output=True, text=True)
-        dump_path.write_text(dump.stdout)
-
-        data = bin_path.read_bytes()
-
-    words: dict[int, int] = {}
-    for idx in range(0, len(data), 4):
-        chunk = data[idx : idx + 4]
-        word = int.from_bytes(chunk.ljust(4, b"\x00"), "little")
-        words[idx // 4] = word
-    return words
+    linker = root / "linker" / "rv64.ld"
+    return build_rv64_program_u32_words(
+        src,
+        linker,
+        march=DEFAULT_MARCH,
+        mabi=DEFAULT_MABI,
+    )
 
 
 async def reset_dut_with_program(

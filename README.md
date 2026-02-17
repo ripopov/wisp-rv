@@ -26,6 +26,9 @@ RV64 RISC-V core project in SystemVerilog with unit tests in Python (cocotb) and
 - `units/<unit-name>/tb`: cocotb testbench for a unit
 - `units/<unit-name>/Makefile`: simulation entrypoint for that unit
 - `tests/integration`: top-level CPU + memory subsystem end-to-end tests
+- `tests/integration/programs`: bare-metal RV64 program sources used by integration tests
+- `tests/integration/linker`: shared linker scripts for integration program builds
+- `tests/integration/utils`: toolchain discovery and RV64 build helpers
 
 ## Implemented units
 
@@ -145,4 +148,10 @@ Run integration tests:
 
 ```bash
 PATH="$(pwd)/.venv/bin:$PATH" make -C tests/integration SIM=verilator
+```
+
+Run integration build-pipeline tests:
+
+```bash
+PATH="$(pwd)/.venv/bin:$PATH" pytest tests/integration/test_program_build.py
 ```
