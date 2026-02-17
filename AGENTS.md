@@ -78,3 +78,13 @@ riscv64-unknown-elf-objdump -d -M no-aliases <program>.elf
 - Branch/redirect tests should assert both sides of correctness: taken-path side effects must appear and wrong-path side effects must remain absent.
 - Keep integration completion signaling deterministic: write `tohost`, then allow a short drain window so in-flight pipeline activity can retire before final memory assertions.
 - Local test commands should include the project virtualenv on `PATH` so `cocotb-config` resolves, for example: `PATH="$(pwd)/.venv/bin:$PATH" make -C <target> SIM=verilator`.
+
+## Stage-07 lessons learned (keep applying)
+
+- Load-use hazard detection must be opcode-aware about source register usage. Do not treat IF/ID `rs2` bits as a true dependency for I-type ops (`OP_IMM`, `OP_IMM_32`, `LOAD`, `JALR`) or false stalls will appear.
+- EX/MEM forwarding must not be used for loads (`mem_to_reg=1`) because load data is not available until MEM/WB. Only forward EX/MEM when the value is already final (for example ALU results).
+- Store-data forwarding is required too: feed forwarded `rs2` into `ex_mem_reg.rs2_data_in`, otherwise `ALU -> SD` back-to-back sequences can store stale values.
+- Keep control priority deterministic: redirect flush must override load-use stall requests so younger instructions are flushed, not held.
+- For wrong-path checks, use isolated 8-byte-aligned marker addresses. Avoid nearby addresses that share one 64-bit word (for example `0x130` and `0x134`) to prevent readback alias confusion.
+- The GNU assembler in this flow may reject label arithmetic directly in `addi` immediates. For hand-written assembly smoke tests, use explicit constants; for Python-built tests, prefer label/fixup generation.
+- If a small unit test includes `rv64_pkg.sv` and uses `-Wall`, add `-Wno-UNUSEDPARAM` in that unit Makefile to avoid Verilator failing on intentionally unused package constants.
