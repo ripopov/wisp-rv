@@ -68,6 +68,18 @@ RV64 RISC-V core project in SystemVerilog with unit tests in Python (cocotb) and
 - EX stage
   - RTL: `units/ex_stage/rtl/ex_stage.sv`
   - Testbench: `units/ex_stage/tb/test_ex_stage.py`
+- Load align
+  - RTL: `units/load_align/rtl/load_align.sv`
+  - Testbench: `units/load_align/tb/test_load_align.py`
+- Store align
+  - RTL: `units/store_align/rtl/store_align.sv`
+  - Testbench: `units/store_align/tb/test_store_align.py`
+- Data-memory interface adapter
+  - RTL: `units/dmem_if/rtl/dmem_if.sv`
+  - Testbench: `units/dmem_if/tb/test_dmem_if.py`
+- Load/store unit
+  - RTL: `units/lsu/rtl/lsu.sv`
+  - Testbench: `units/lsu/tb/test_lsu.py`
 
 Setup Python dependencies (Python 3.13+):
 
