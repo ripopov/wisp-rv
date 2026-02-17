@@ -59,6 +59,15 @@ RV64 RISC-V core project in SystemVerilog with unit tests in Python (cocotb) and
 - IF stage
   - RTL: `units/if_stage/rtl/if_stage.sv`
   - Testbench: `units/if_stage/tb/test_if_stage.py`
+- Branch unit
+  - RTL: `units/branch_unit/rtl/branch_unit.sv`
+  - Testbench: `units/branch_unit/tb/test_branch_unit.py`
+- Jump unit
+  - RTL: `units/jump_unit/rtl/jump_unit.sv`
+  - Testbench: `units/jump_unit/tb/test_jump_unit.py`
+- EX stage
+  - RTL: `units/ex_stage/rtl/ex_stage.sv`
+  - Testbench: `units/ex_stage/tb/test_ex_stage.py`
 
 Setup Python dependencies (Python 3.13+):
 
