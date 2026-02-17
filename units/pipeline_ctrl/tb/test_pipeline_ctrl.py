@@ -10,6 +10,7 @@ def model_pipeline_ctrl(
     ex_redirect_valid: int,
     ex_redirect_pc: int,
     mem_stall: int,
+    load_use_stall: int,
 ) -> dict[str, int]:
     out = {
         "if_stage_stall": 0,
@@ -26,11 +27,17 @@ def model_pipeline_ctrl(
         "redirect_pc": ex_redirect_pc & MASK64,
     }
 
+    load_use_stall_effective = 1 if (load_use_stall and not ex_redirect_valid) else 0
+
     if mem_stall:
         out["if_stage_stall"] = 1
         out["if_id_stall"] = 1
         out["id_ex_stall"] = 1
         out["ex_mem_stall"] = 1
+    elif load_use_stall_effective:
+        out["if_stage_stall"] = 1
+        out["if_id_stall"] = 1
+        out["id_ex_flush"] = 1
 
     if ex_redirect_valid:
         out["if_stage_flush"] = 1
@@ -45,14 +52,21 @@ async def check_case(
     ex_redirect_valid: int,
     ex_redirect_pc: int,
     mem_stall: int,
+    load_use_stall: int,
     name: str,
 ) -> None:
     dut.ex_redirect_valid.value = ex_redirect_valid
     dut.ex_redirect_pc.value = ex_redirect_pc & MASK64
     dut.mem_stall.value = mem_stall
+    dut.load_use_stall.value = load_use_stall
     await Timer(1, unit="ns")
 
-    expected = model_pipeline_ctrl(ex_redirect_valid, ex_redirect_pc, mem_stall)
+    expected = model_pipeline_ctrl(
+        ex_redirect_valid,
+        ex_redirect_pc,
+        mem_stall,
+        load_use_stall,
+    )
 
     for field in (
         "if_stage_stall",
@@ -81,14 +95,23 @@ async def check_case(
 @cocotb.test()
 async def test_pipeline_ctrl_directed(dut):
     vectors = [
-        ("IDLE", 0, 0x0, 0),
-        ("MEM_STALL_ONLY", 0, 0x1234, 1),
-        ("REDIRECT_ONLY", 1, 0x1000, 0),
-        ("REDIRECT_AND_STALL", 1, 0x2000, 1),
+        ("IDLE", 0, 0x0, 0, 0),
+        ("LOAD_USE_ONLY", 0, 0x0, 0, 1),
+        ("MEM_STALL_ONLY", 0, 0x1234, 1, 0),
+        ("REDIRECT_ONLY", 1, 0x1000, 0, 0),
+        ("REDIRECT_AND_MEM_STALL", 1, 0x2000, 1, 0),
+        ("REDIRECT_WINS_OVER_LOAD_USE", 1, 0x3000, 0, 1),
     ]
 
-    for name, ex_redirect_valid, ex_redirect_pc, mem_stall in vectors:
-        await check_case(dut, ex_redirect_valid, ex_redirect_pc, mem_stall, name)
+    for name, ex_redirect_valid, ex_redirect_pc, mem_stall, load_use_stall in vectors:
+        await check_case(
+            dut,
+            ex_redirect_valid,
+            ex_redirect_pc,
+            mem_stall,
+            load_use_stall,
+            name,
+        )
 
 
 @cocotb.test()
@@ -99,10 +122,12 @@ async def test_pipeline_ctrl_randomized(dut):
         ex_redirect_valid = random.getrandbits(1)
         ex_redirect_pc = random.getrandbits(64)
         mem_stall = random.getrandbits(1)
+        load_use_stall = random.getrandbits(1)
         await check_case(
             dut,
             ex_redirect_valid,
             ex_redirect_pc,
             mem_stall,
+            load_use_stall,
             f"RAND_{idx}",
         )

@@ -187,89 +187,73 @@ class AsmBuilder:
         return list(self.words)
 
 
-def build_stage6_program() -> tuple[list[int], dict[str, int]]:
+def build_stage7_program() -> tuple[list[int], dict[str, int]]:
     b = AsmBuilder()
 
-    # Arithmetic chain with manual hazard padding.
+    # Bring-up NOP to avoid reset/fetch edge sensitivity.
     b.nop()
+
+    # EX/MEM forwarding.
     b.addi(1, 0, 5)
-    b.nop()
-    b.nop()
-    b.nop()
     b.addi(2, 1, 10)
-    b.nop()
-    b.nop()
-    b.nop()
     b.sd(2, 0, 0x100)
 
-    # Branch/flush behavior.
-    b.beq(0, 0, "branch_taken")
-    b.addi(14, 0, 99)
-    b.nop()
-    b.nop()
-    b.sd(14, 0, 0x110)
-    b.label("branch_taken")
-    b.addi(5, 0, 42)
-    b.nop()
-    b.nop()
-    b.nop()
-    b.nop()
+    # MEM/WB forwarding.
+    b.addi(3, 0, 7)
+    b.addi(4, 0, 1)
+    b.addi(5, 3, 9)
     b.sd(5, 0, 0x108)
 
-    # Store + load + dependent ALU op.
-    b.addi(6, 0, 0x55)
-    b.nop()
-    b.nop()
-    b.nop()
-    b.sd(6, 0, 0x120)
-    b.nop()
-    b.nop()
-    b.nop()
-    b.ld(7, 0, 0x120)
-    b.nop()
-    b.nop()
-    b.nop()
-    b.nop()
-    b.addi(7, 7, 1)
-    b.nop()
-    b.nop()
-    b.sd(7, 0, 0x128)
+    # EX/MEM priority over MEM/WB.
+    b.addi(6, 0, 5)
+    b.addi(6, 0, 7)
+    b.addi(7, 6, 10)
+    b.sd(7, 0, 0x110)
 
-    # AUIPC + JALR pattern.
+    # x0 must never receive forwarded data.
+    b.addi(0, 0, 5)
+    b.addi(8, 0, 10)
+    b.sd(8, 0, 0x118)
+
+    # Store-data forwarding and load-use hazard stalling.
+    b.addi(9, 0, 0x44)
+    b.sd(9, 0, 0x120)
+    b.ld(10, 0, 0x120)
+    b.addi(11, 10, 1)
+    b.sd(11, 0, 0x128)
+
+    # Branch with forwarded operands + wrong-path flush.
+    b.addi(12, 0, 5)
+    b.addi(13, 0, 5)
+    b.beq(12, 13, "branch_taken")
+    b.addi(14, 0, 99)
+    b.sd(14, 0, 0x158)
+    b.label("branch_taken")
+    b.addi(14, 0, 42)
+    b.sd(14, 0, 0x130)
+
+    # AUIPC + JALR with forwarded base + wrong-path flush.
     b.label("auipc_site")
-    b.auipc(10, 0)
-    b.nop()
-    b.nop()
-    b.addi_label_delta(10, 10, "auipc_site", "jalr_target")
-    b.nop()
-    b.nop()
+    b.auipc(20, 0)
+    b.addi_label_delta(20, 20, "auipc_site", "jalr_target")
     b.label("jalr_site")
-    b.jalr(11, 10, 0)
-    b.addi(12, 0, 0xDE)
+    b.jalr(21, 20, 0)
+    b.addi(22, 0, 0xDE)
+    b.sd(22, 0, 0x150)
     b.label("jalr_target")
-    b.addi(12, 0, 0x33)
-    b.nop()
-    b.nop()
-    b.sd(12, 0, 0x130)
-    b.sd(11, 0, 0x138)
+    b.addi(22, 0, 0x33)
+    b.sd(22, 0, 0x138)
+    b.sd(21, 0, 0x140)
 
-    # LUI + ADDI constant build.
-    b.lui(13, 0x12345)
-    b.nop()
-    b.nop()
-    b.nop()
-    b.addi(13, 13, 0x678)
-    b.nop()
-    b.nop()
-    b.nop()
-    b.sd(13, 0, 0x140)
+    # LUI + ADDI constant build with forwarding.
+    b.lui(23, 0x12345)
+    b.addi(23, 23, 0x678)
+    b.sd(23, 0, 0x148)
 
-    # Completion signal.
-    b.addi(8, 0, TOHOST_ADDR)
-    b.addi(9, 0, 1)
-    b.nop()
-    b.nop()
-    b.sd(9, 8, 0)
+    # Completion signal with dependencies on both store operands.
+    b.addi(24, 0, TOHOST_ADDR)
+    b.addi(25, 0, 1)
+    b.sd(25, 24, 0)
 
     b.label("spin")
     b.jal(0, "spin")
@@ -277,11 +261,15 @@ def build_stage6_program() -> tuple[list[int], dict[str, int]]:
     words = b.resolve()
 
     expected = {
-        "arith": 15,
+        "ex_mem_forward": 15,
+        "mem_wb_forward": 16,
+        "ex_mem_priority": 17,
+        "x0_guard": 10,
+        "store_load": 0x45,
         "branch_taken": 42,
-        "branch_not_taken_marker": 0,
-        "store_load": 0x56,
+        "branch_wrong_path": 0,
         "jalr_target_value": 0x33,
+        "jalr_wrong_path": 0,
         "lui_addi_value": 0x1234_5678,
         "jalr_link": b.labels["jalr_site"] + 4,
     }
@@ -374,35 +362,41 @@ async def run_program(
 
 def assert_program_results(dmem: dict[int, int], expected: dict[str, int]) -> None:
     observed = {
-        "arith": read_u64(dmem, 0x100),
-        "branch_taken": read_u64(dmem, 0x108),
-        "branch_not_taken_marker": read_u64(dmem, 0x110),
+        "ex_mem_forward": read_u64(dmem, 0x100),
+        "mem_wb_forward": read_u64(dmem, 0x108),
+        "ex_mem_priority": read_u64(dmem, 0x110),
+        "x0_guard": read_u64(dmem, 0x118),
         "store_value": read_u64(dmem, 0x120),
         "store_load": read_u64(dmem, 0x128),
-        "jalr_target_value": read_u64(dmem, 0x130),
-        "jalr_link": read_u64(dmem, 0x138),
-        "lui_addi_value": read_u64(dmem, 0x140),
+        "branch_taken": read_u64(dmem, 0x130),
+        "branch_wrong_path": read_u64(dmem, 0x158),
+        "jalr_target_value": read_u64(dmem, 0x138),
+        "jalr_link": read_u64(dmem, 0x140),
+        "lui_addi_value": read_u64(dmem, 0x148),
+        "jalr_wrong_path": read_u64(dmem, 0x150),
         "tohost": read_u64(dmem, TOHOST_ADDR),
     }
     assert observed["jalr_link"] == expected["jalr_link"], observed
-    assert observed["arith"] == expected["arith"], observed
+    assert observed["ex_mem_forward"] == expected["ex_mem_forward"], observed
+    assert observed["mem_wb_forward"] == expected["mem_wb_forward"], observed
+    assert observed["ex_mem_priority"] == expected["ex_mem_priority"], observed
+    assert observed["x0_guard"] == expected["x0_guard"], observed
     assert observed["branch_taken"] == expected["branch_taken"], observed
-    assert observed["branch_not_taken_marker"] == expected["branch_not_taken_marker"], (
-        observed
-    )
-    assert observed["store_value"] == 0x55, observed
+    assert observed["branch_wrong_path"] == expected["branch_wrong_path"], observed
+    assert observed["store_value"] == 0x44, observed
     assert observed["store_load"] == expected["store_load"], observed
     assert observed["jalr_target_value"] == expected["jalr_target_value"], observed
+    assert observed["jalr_wrong_path"] == expected["jalr_wrong_path"], observed
     assert observed["lui_addi_value"] == expected["lui_addi_value"], observed
     assert observed["tohost"] == 1, observed
 
 
 @cocotb.test()
-async def test_core_top_stage6_program(dut):
+async def test_core_top_stage7_program(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset_dut(dut)
 
-    program_words, expected = build_stage6_program()
+    program_words, expected = build_stage7_program()
     dmem = await run_program(
         dut,
         program_words,
@@ -413,11 +407,11 @@ async def test_core_top_stage6_program(dut):
 
 
 @cocotb.test()
-async def test_core_top_stage6_program_with_backpressure(dut):
+async def test_core_top_stage7_program_with_backpressure(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset_dut(dut)
 
-    program_words, expected = build_stage6_program()
+    program_words, expected = build_stage7_program()
     dmem = await run_program(
         dut,
         program_words,

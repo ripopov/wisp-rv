@@ -43,15 +43,15 @@ def build_program() -> dict[int, int]:
     tools = require_toolchain()
 
     root = Path(__file__).resolve().parent
-    src = root / "programs" / "stage6_smoke.S"
+    src = root / "programs" / "stage7_smoke.S"
     linker = root / "linker.ld"
 
-    with tempfile.TemporaryDirectory(prefix="wisp-rv64-stage6-") as tmpdir:
+    with tempfile.TemporaryDirectory(prefix="wisp-rv64-stage7-") as tmpdir:
         out = Path(tmpdir)
-        elf = out / "stage6_smoke.elf"
-        bin_path = out / "stage6_smoke.bin"
-        map_path = out / "stage6_smoke.map"
-        dump_path = out / "stage6_smoke.dump"
+        elf = out / "stage7_smoke.elf"
+        bin_path = out / "stage7_smoke.bin"
+        map_path = out / "stage7_smoke.map"
+        dump_path = out / "stage7_smoke.dump"
 
         gcc_cmd = [
             tools["riscv64-unknown-elf-gcc"],
@@ -110,7 +110,7 @@ async def reset_dut(dut, cycles: int = 5) -> None:
 
 
 @cocotb.test()
-async def test_stage6_program_end_to_end(dut):
+async def test_stage7_program_end_to_end(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset_dut(dut)
 
@@ -165,10 +165,14 @@ async def test_stage6_program_end_to_end(dut):
 
     assert read_u64(dmem, TOHOST_ADDR) == 1
     assert read_u64(dmem, 0x100) == 15
-    assert read_u64(dmem, 0x108) == 42
-    assert read_u64(dmem, 0x110) == 0
-    assert read_u64(dmem, 0x120) == 0x55
-    assert read_u64(dmem, 0x128) == 0x56
-    assert read_u64(dmem, 0x130) == 0x33
-    assert read_u64(dmem, 0x138) != 0
-    assert read_u64(dmem, 0x140) == 0x1234_5678
+    assert read_u64(dmem, 0x108) == 16
+    assert read_u64(dmem, 0x110) == 17
+    assert read_u64(dmem, 0x118) == 10
+    assert read_u64(dmem, 0x120) == 0x44
+    assert read_u64(dmem, 0x128) == 0x45
+    assert read_u64(dmem, 0x130) == 42
+    assert read_u64(dmem, 0x158) == 0
+    assert read_u64(dmem, 0x138) == 0x33
+    assert read_u64(dmem, 0x140) != 0
+    assert read_u64(dmem, 0x148) == 0x1234_5678
+    assert read_u64(dmem, 0x150) == 0

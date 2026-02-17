@@ -1,11 +1,11 @@
 /*
  * Module: core_top
- * Purpose: Integrate IF/ID/EX/MEM/WB pipeline stages into a Stage-06 RV64 core.
+ * Purpose: Integrate IF/ID/EX/MEM/WB pipeline stages into a Stage-07 RV64 core.
  * Interface: Clock/reset, instruction-memory and data-memory interfaces, plus debug writeback visibility.
- * Behavior: Single-issue in-order 5-stage pipeline without forwarding.
+ * Behavior: Single-issue in-order 5-stage pipeline with forwarding and load-use hazard stalling.
  * Reset: Active-high synchronous reset for stage state elements.
- * Pipeline control: Handles EX redirects and MEM stalls through pipeline_ctrl.
- * Corner cases: Redirect flushes younger IF/ID and ID/EX instructions; invalid bubbles are inert.
+ * Pipeline control: Handles redirects, load-use bubbles, and memory backpressure through hazard/forwarding control.
+ * Corner cases: Redirects override load-use stalls; forwarding never sources x0.
  */
 module core_top #(
     parameter logic [63:0] RESET_VECTOR = 64'h0000_0000_0000_0000,
@@ -49,6 +49,7 @@ module core_top #(
     logic        mem_wb_flush;
     logic        redirect_valid;
     logic [63:0] redirect_pc;
+    logic        load_use_stall;
 
     logic [63:0] if_pc;
     logic [31:0] if_instr;
@@ -100,6 +101,10 @@ module core_top #(
     logic        ex_branch_taken_raw;
     logic [63:0] ex_branch_target_raw;
     logic        ex_redirect_valid;
+    logic [1:0]  forward_a_sel;
+    logic [1:0]  forward_b_sel;
+    logic [63:0] ex_rs1_data_fwd;
+    logic [63:0] ex_rs2_data_fwd;
 
     logic [63:0] mem_pc;
     logic [63:0] mem_alu_result;
@@ -131,6 +136,8 @@ module core_top #(
     logic [1:0]  wb_sel;
     logic [63:0] wb_data;
     logic        wb_write_enable;
+    logic        ex_mem_forward_reg_write;
+    logic [63:0] ex_mem_forward_data;
 
     if_stage #(
         .RESET_VECTOR(RESET_VECTOR)
@@ -208,6 +215,17 @@ module core_top #(
         end
     end
 
+    hazard_unit u_hazard_unit (
+        .id_ex_valid(ex_valid),
+        .id_ex_mem_read(ex_mem_read),
+        .id_ex_rd(ex_rd),
+        .if_id_valid(id_issue_valid),
+        .if_id_opcode(id_opcode),
+        .if_id_rs1(id_rs1),
+        .if_id_rs2(id_rs2),
+        .load_use_stall(load_use_stall)
+    );
+
     regfile u_regfile (
         .clk(clk),
         .rst(rst),
@@ -269,8 +287,8 @@ module core_top #(
 
     ex_stage u_ex_stage (
         .pc(ex_pc),
-        .rs1_data(ex_rs1_data),
-        .rs2_data(ex_rs2_data),
+        .rs1_data(ex_rs1_data_fwd),
+        .rs2_data(ex_rs2_data_fwd),
         .imm(ex_imm),
         .opcode(ex_opcode),
         .funct3(ex_funct3),
@@ -293,7 +311,7 @@ module core_top #(
         .flush(ex_mem_flush),
         .pc_in(ex_pc),
         .alu_result_in(ex_alu_result),
-        .rs2_data_in(ex_rs2_data),
+        .rs2_data_in(ex_rs2_data_fwd),
         .rd_in(ex_rd),
         .funct3_in(ex_funct3),
         .mem_read_in(ex_mem_read),
@@ -381,10 +399,42 @@ module core_top #(
 
     assign wb_write_enable = wb_valid && wb_reg_write && (wb_rd != 5'd0);
 
+    assign ex_mem_forward_reg_write = mem_valid && mem_reg_write && !mem_mem_to_reg;
+    assign ex_mem_forward_data = mem_alu_result;
+
+    forwarding_unit u_forwarding_unit (
+        .ex_mem_reg_write(ex_mem_forward_reg_write),
+        .ex_mem_rd(mem_rd),
+        .mem_wb_reg_write(wb_valid && wb_reg_write),
+        .mem_wb_rd(wb_rd),
+        .id_ex_rs1(ex_rs1_addr),
+        .id_ex_rs2(ex_rs2_addr),
+        .forward_a_sel(forward_a_sel),
+        .forward_b_sel(forward_b_sel)
+    );
+
+    always_comb begin
+        ex_rs1_data_fwd = ex_rs1_data;
+        ex_rs2_data_fwd = ex_rs2_data;
+
+        unique case (forward_a_sel)
+            2'b01: ex_rs1_data_fwd = ex_mem_forward_data;
+            2'b10: ex_rs1_data_fwd = wb_data;
+            default: ex_rs1_data_fwd = ex_rs1_data;
+        endcase
+
+        unique case (forward_b_sel)
+            2'b01: ex_rs2_data_fwd = ex_mem_forward_data;
+            2'b10: ex_rs2_data_fwd = wb_data;
+            default: ex_rs2_data_fwd = ex_rs2_data;
+        endcase
+    end
+
     pipeline_ctrl u_pipeline_ctrl (
         .ex_redirect_valid(ex_redirect_valid),
         .ex_redirect_pc(ex_branch_target_raw),
         .mem_stall(lsu_mem_stall),
+        .load_use_stall(load_use_stall),
         .if_stage_stall(if_stage_stall),
         .if_stage_flush(if_stage_flush),
         .if_id_stall(if_id_stall),

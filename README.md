@@ -83,10 +83,16 @@ RV64 RISC-V core project in SystemVerilog with unit tests in Python (cocotb) and
 - WB mux
   - RTL: `units/wb_mux/rtl/wb_mux.sv`
   - Testbench: `units/wb_mux/tb/test_wb_mux.py`
-- Pipeline control (v1)
+- Forwarding unit
+  - RTL: `units/forwarding_unit/rtl/forwarding_unit.sv`
+  - Testbench: `units/forwarding_unit/tb/test_forwarding_unit.py`
+- Hazard unit
+  - RTL: `units/hazard_unit/rtl/hazard_unit.sv`
+  - Testbench: `units/hazard_unit/tb/test_hazard_unit.py`
+- Pipeline control (v2)
   - RTL: `units/pipeline_ctrl/rtl/pipeline_ctrl.sv`
   - Testbench: `units/pipeline_ctrl/tb/test_pipeline_ctrl.py`
-- Core top-level integration (v1)
+- Core top-level integration (v2)
   - RTL: `units/core_top/rtl/core_top.sv`
   - Testbench: `units/core_top/tb/test_core_top.py`
 
