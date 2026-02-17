@@ -27,6 +27,7 @@ RV64 RISC-V core project in SystemVerilog with unit tests in Python (cocotb) and
 - `units/<unit-name>/Makefile`: simulation entrypoint for that unit
 - `tests/integration`: top-level CPU + memory subsystem end-to-end tests
 - `tests/integration/programs`: bare-metal RV64 program sources used by integration tests
+- `tests/integration/benchmarks`: benchmark sources used by Stage-13 perf smoke checks
 - `tests/integration/linker`: shared linker scripts for integration program builds
 - `tests/integration/utils`: toolchain discovery and RV64 build helpers
 
@@ -155,6 +156,7 @@ The integration Makefile runs:
 - `test_core_top_integration.py`
 - `test_rv64_programs.py`
 - `test_randomized_streams.py`
+- `test_perf_smoke.py`
 
 Run integration build-pipeline tests:
 

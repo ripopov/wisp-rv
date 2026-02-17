@@ -18,6 +18,7 @@ from utils.build_rv64_program import (
 )
 
 PROGRAMS_DIR = THIS_DIR / "programs"
+BENCHMARKS_DIR = THIS_DIR / "benchmarks"
 LINKER_SCRIPT = THIS_DIR / "linker" / "rv64.ld"
 
 
@@ -87,6 +88,16 @@ def test_program_sources_do_not_include_prebuilt_binaries() -> None:
         if path.is_file() and path.suffix in disallowed_suffixes
     )
     assert not prebuilt, f"Found prebuilt integration artifacts: {prebuilt}"
+
+
+def test_benchmark_sources_do_not_include_prebuilt_binaries() -> None:
+    disallowed_suffixes = {".elf", ".bin", ".map", ".dump", ".o"}
+    prebuilt = sorted(
+        str(path.relative_to(BENCHMARKS_DIR))
+        for path in BENCHMARKS_DIR.rglob("*")
+        if path.is_file() and path.suffix in disallowed_suffixes
+    )
+    assert not prebuilt, f"Found prebuilt benchmark artifacts: {prebuilt}"
 
 
 def test_missing_toolchain_error_is_clear(monkeypatch: pytest.MonkeyPatch) -> None:
