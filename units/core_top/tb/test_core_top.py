@@ -7,7 +7,9 @@ from cocotb.triggers import ClockCycles, ReadWrite, RisingEdge, Timer
 
 MASK64 = (1 << 64) - 1
 
+OP = 0b0110011
 OP_IMM = 0b0010011
+OP_32 = 0b0111011
 LOAD = 0b0000011
 STORE = 0b0100011
 BRANCH = 0b1100011
@@ -26,6 +28,12 @@ F3_CSRRC = 0b011
 F3_CSRRWI = 0b101
 F3_CSRRSI = 0b110
 F3_CSRRCI = 0b111
+F3_DIV = 0b100
+F3_DIVU = 0b101
+F3_REM = 0b110
+F3_REMU = 0b111
+
+F7_M_EXT = 0b0000001
 
 CSR_MSTATUS = 0x300
 CSR_MIE = 0x304
@@ -65,6 +73,17 @@ def write_u64(memory: dict[int, int], addr: int, wdata: int, byte_en: int) -> No
 def enc_i(imm12: int, rs1: int, funct3: int, rd: int, opcode: int) -> int:
     return (
         ((imm12 & 0xFFF) << 20)
+        | ((rs1 & 0x1F) << 15)
+        | ((funct3 & 0x7) << 12)
+        | ((rd & 0x1F) << 7)
+        | (opcode & 0x7F)
+    )
+
+
+def enc_r(funct7: int, rs2: int, rs1: int, funct3: int, rd: int, opcode: int) -> int:
+    return (
+        ((funct7 & 0x7F) << 25)
+        | ((rs2 & 0x1F) << 20)
         | ((rs1 & 0x1F) << 15)
         | ((funct3 & 0x7) << 12)
         | ((rd & 0x1F) << 7)
@@ -144,6 +163,9 @@ class AsmBuilder:
     def addi(self, rd: int, rs1: int, imm12: int) -> None:
         self.emit(enc_i(imm12, rs1, 0b000, rd, OP_IMM))
 
+    def slli(self, rd: int, rs1: int, shamt: int) -> None:
+        self.emit(enc_i(shamt & 0x3F, rs1, 0b001, rd, OP_IMM))
+
     def addi_label_delta(
         self, rd: int, rs1: int, base_label: str, target_label: str
     ) -> None:
@@ -179,6 +201,50 @@ class AsmBuilder:
 
     def jalr(self, rd: int, rs1: int, imm12: int) -> None:
         self.emit(enc_i(imm12, rs1, 0b000, rd, JALR))
+
+    def r_type(
+        self, funct7: int, rs2: int, rs1: int, funct3: int, rd: int, opcode: int
+    ) -> None:
+        self.emit(enc_r(funct7, rs2, rs1, funct3, rd, opcode))
+
+    def mul(self, rd: int, rs1: int, rs2: int) -> None:
+        self.r_type(F7_M_EXT, rs2, rs1, 0b000, rd, OP)
+
+    def mulh(self, rd: int, rs1: int, rs2: int) -> None:
+        self.r_type(F7_M_EXT, rs2, rs1, 0b001, rd, OP)
+
+    def mulhsu(self, rd: int, rs1: int, rs2: int) -> None:
+        self.r_type(F7_M_EXT, rs2, rs1, 0b010, rd, OP)
+
+    def mulhu(self, rd: int, rs1: int, rs2: int) -> None:
+        self.r_type(F7_M_EXT, rs2, rs1, 0b011, rd, OP)
+
+    def mulw(self, rd: int, rs1: int, rs2: int) -> None:
+        self.r_type(F7_M_EXT, rs2, rs1, 0b000, rd, OP_32)
+
+    def div(self, rd: int, rs1: int, rs2: int) -> None:
+        self.r_type(F7_M_EXT, rs2, rs1, F3_DIV, rd, OP)
+
+    def divu(self, rd: int, rs1: int, rs2: int) -> None:
+        self.r_type(F7_M_EXT, rs2, rs1, F3_DIVU, rd, OP)
+
+    def rem(self, rd: int, rs1: int, rs2: int) -> None:
+        self.r_type(F7_M_EXT, rs2, rs1, F3_REM, rd, OP)
+
+    def remu(self, rd: int, rs1: int, rs2: int) -> None:
+        self.r_type(F7_M_EXT, rs2, rs1, F3_REMU, rd, OP)
+
+    def divw(self, rd: int, rs1: int, rs2: int) -> None:
+        self.r_type(F7_M_EXT, rs2, rs1, F3_DIV, rd, OP_32)
+
+    def divuw(self, rd: int, rs1: int, rs2: int) -> None:
+        self.r_type(F7_M_EXT, rs2, rs1, F3_DIVU, rd, OP_32)
+
+    def remw(self, rd: int, rs1: int, rs2: int) -> None:
+        self.r_type(F7_M_EXT, rs2, rs1, F3_REM, rd, OP_32)
+
+    def remuw(self, rd: int, rs1: int, rs2: int) -> None:
+        self.r_type(F7_M_EXT, rs2, rs1, F3_REMU, rd, OP_32)
 
     def csrrw(self, rd: int, csr: int, rs1: int) -> None:
         self.emit(enc_i(csr, rs1, F3_CSRRW, rd, SYSTEM))
@@ -235,7 +301,7 @@ class AsmBuilder:
         return list(self.words)
 
 
-def build_stage8_program() -> tuple[list[int], dict[str, int]]:
+def build_stage9_program() -> tuple[list[int], dict[str, int]]:
     b = AsmBuilder()
 
     # Bring-up NOP to avoid reset/fetch edge sensitivity.
@@ -313,6 +379,92 @@ def build_stage8_program() -> tuple[list[int], dict[str, int]]:
     b.csrrs(23, CSR_MSCRATCH, 0)
     b.sd(23, 0, 0x190)
 
+    # M-extension multiply checks.
+    b.addi(28, 0, 6)
+    b.addi(29, 0, 7)
+    b.mul(30, 28, 29)
+    b.sd(30, 0, 0x198)
+
+    b.addi(28, 0, -3)
+    b.addi(29, 0, 5)
+    b.mulh(30, 28, 29)
+    b.sd(30, 0, 0x1A0)
+    b.mulhsu(30, 28, 29)
+    b.sd(30, 0, 0x1A8)
+
+    b.addi(28, 0, -1)
+    b.addi(29, 0, 2)
+    b.mulhu(30, 28, 29)
+    b.sd(30, 0, 0x1B0)
+    b.mulw(30, 28, 29)
+    b.sd(30, 0, 0x1B8)
+
+    # M-extension divide/remainder checks.
+    b.addi(28, 0, 100)
+    b.addi(29, 0, 7)
+    b.div(30, 28, 29)
+    b.sd(30, 0, 0x1C0)
+
+    b.addi(29, 0, 0)
+    b.div(30, 28, 29)
+    b.sd(30, 0, 0x1C8)
+
+    b.addi(28, 0, 1)
+    b.slli(28, 28, 63)
+    b.addi(29, 0, -1)
+    b.div(30, 28, 29)
+    b.sd(30, 0, 0x1D0)
+
+    b.addi(28, 0, -1)
+    b.addi(29, 0, 3)
+    b.divu(30, 28, 29)
+    b.sd(30, 0, 0x1D8)
+
+    b.addi(28, 0, -9)
+    b.addi(29, 0, 2)
+    b.rem(30, 28, 29)
+    b.sd(30, 0, 0x1E0)
+
+    b.addi(28, 0, -1)
+    b.addi(29, 0, 3)
+    b.remu(30, 28, 29)
+    b.sd(30, 0, 0x1E8)
+
+    b.addi(28, 0, -9)
+    b.addi(29, 0, 2)
+    b.divw(30, 28, 29)
+    b.sd(30, 0, 0x1F0)
+
+    b.addi(28, 0, -2)
+    b.addi(29, 0, 3)
+    b.divuw(30, 28, 29)
+    b.sd(30, 0, 0x1F8)
+
+    b.addi(29, 0, 0)
+    b.divuw(30, 28, 29)
+    b.sd(30, 0, 0x210)
+
+    b.addi(28, 0, -9)
+    b.addi(29, 0, 2)
+    b.remw(30, 28, 29)
+    b.sd(30, 0, 0x218)
+
+    b.addi(28, 0, -2)
+    b.addi(29, 0, 3)
+    b.remuw(30, 28, 29)
+    b.sd(30, 0, 0x220)
+
+    b.addi(29, 0, 0)
+    b.remuw(30, 28, 29)
+    b.sd(30, 0, 0x228)
+
+    # Verify divide result can be consumed immediately after divide completion.
+    b.addi(28, 0, 100)
+    b.addi(29, 0, 7)
+    b.div(30, 28, 29)
+    b.addi(31, 30, 1)
+    b.sd(31, 0, 0x230)
+
     # Completion signal.
     b.addi(24, 0, TOHOST_ADDR)
     b.addi(25, 0, 1)
@@ -353,6 +505,24 @@ def build_stage8_program() -> tuple[list[int], dict[str, int]]:
         "ro_write_mepc": b.labels["ro_write_site"] + 4,
         "ro_write_mtval": ro_write_instr,
         "final_trap_count": 3,
+        "mul": 42,
+        "mulh": 0xFFFF_FFFF_FFFF_FFFF,
+        "mulhsu": 0xFFFF_FFFF_FFFF_FFFF,
+        "mulhu": 1,
+        "mulw": 0xFFFF_FFFF_FFFF_FFFE,
+        "div": 14,
+        "div_by_zero": 0xFFFF_FFFF_FFFF_FFFF,
+        "div_overflow": 0x8000_0000_0000_0000,
+        "divu": 0x5555_5555_5555_5555,
+        "rem": 0xFFFF_FFFF_FFFF_FFFF,
+        "remu": 0,
+        "divw": 0xFFFF_FFFF_FFFF_FFFC,
+        "divuw": 0x0000_0000_5555_5554,
+        "divuw_by_zero": 0xFFFF_FFFF_FFFF_FFFF,
+        "remw": 0xFFFF_FFFF_FFFF_FFFF,
+        "remuw": 2,
+        "remuw_by_zero": 0xFFFF_FFFF_FFFF_FFFE,
+        "div_dependency": 15,
     }
     return words, expected
 
@@ -462,6 +632,24 @@ def assert_program_results(dmem: dict[int, int], expected: dict[str, int]) -> No
         "ro_write_mepc": read_u64(dmem, 0x180),
         "ro_write_mtval": read_u64(dmem, 0x188),
         "final_trap_count": read_u64(dmem, 0x190),
+        "mul": read_u64(dmem, 0x198),
+        "mulh": read_u64(dmem, 0x1A0),
+        "mulhsu": read_u64(dmem, 0x1A8),
+        "mulhu": read_u64(dmem, 0x1B0),
+        "mulw": read_u64(dmem, 0x1B8),
+        "div": read_u64(dmem, 0x1C0),
+        "div_by_zero": read_u64(dmem, 0x1C8),
+        "div_overflow": read_u64(dmem, 0x1D0),
+        "divu": read_u64(dmem, 0x1D8),
+        "rem": read_u64(dmem, 0x1E0),
+        "remu": read_u64(dmem, 0x1E8),
+        "divw": read_u64(dmem, 0x1F0),
+        "divuw": read_u64(dmem, 0x1F8),
+        "divuw_by_zero": read_u64(dmem, 0x210),
+        "remw": read_u64(dmem, 0x218),
+        "remuw": read_u64(dmem, 0x220),
+        "remuw_by_zero": read_u64(dmem, 0x228),
+        "div_dependency": read_u64(dmem, 0x230),
         "tohost": read_u64(dmem, TOHOST_ADDR),
     }
     assert observed["forward_basic"] == expected["forward_basic"], observed
@@ -483,6 +671,24 @@ def assert_program_results(dmem: dict[int, int], expected: dict[str, int]) -> No
     assert observed["ro_write_mepc"] == expected["ro_write_mepc"], observed
     assert observed["ro_write_mtval"] == expected["ro_write_mtval"], observed
     assert observed["final_trap_count"] == expected["final_trap_count"], observed
+    assert observed["mul"] == expected["mul"], observed
+    assert observed["mulh"] == expected["mulh"], observed
+    assert observed["mulhsu"] == expected["mulhsu"], observed
+    assert observed["mulhu"] == expected["mulhu"], observed
+    assert observed["mulw"] == expected["mulw"], observed
+    assert observed["div"] == expected["div"], observed
+    assert observed["div_by_zero"] == expected["div_by_zero"], observed
+    assert observed["div_overflow"] == expected["div_overflow"], observed
+    assert observed["divu"] == expected["divu"], observed
+    assert observed["rem"] == expected["rem"], observed
+    assert observed["remu"] == expected["remu"], observed
+    assert observed["divw"] == expected["divw"], observed
+    assert observed["divuw"] == expected["divuw"], observed
+    assert observed["divuw_by_zero"] == expected["divuw_by_zero"], observed
+    assert observed["remw"] == expected["remw"], observed
+    assert observed["remuw"] == expected["remuw"], observed
+    assert observed["remuw_by_zero"] == expected["remuw_by_zero"], observed
+    assert observed["div_dependency"] == expected["div_dependency"], observed
     assert observed["mcycle_snapshot"] > 0, observed
     assert observed["minstret_snapshot"] > 0, observed
     assert observed["mcycle_snapshot"] >= observed["minstret_snapshot"], observed
@@ -490,11 +696,11 @@ def assert_program_results(dmem: dict[int, int], expected: dict[str, int]) -> No
 
 
 @cocotb.test()
-async def test_core_top_stage8_program(dut):
+async def test_core_top_stage9_program(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset_dut(dut)
 
-    program_words, expected = build_stage8_program()
+    program_words, expected = build_stage9_program()
     dmem = await run_program(
         dut,
         program_words,
@@ -505,11 +711,11 @@ async def test_core_top_stage8_program(dut):
 
 
 @cocotb.test()
-async def test_core_top_stage8_program_with_backpressure(dut):
+async def test_core_top_stage9_program_with_backpressure(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset_dut(dut)
 
-    program_words, expected = build_stage8_program()
+    program_words, expected = build_stage9_program()
     dmem = await run_program(
         dut,
         program_words,

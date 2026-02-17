@@ -1,10 +1,10 @@
 /*
  * Module: core_top
- * Purpose: Integrate IF/ID/EX/MEM/WB pipeline stages into a Stage-08 RV64 core.
+ * Purpose: Integrate IF/ID/EX/MEM/WB pipeline stages into a Stage-09 RV64 core.
  * Interface: Clock/reset, instruction-memory and data-memory interfaces, plus debug writeback visibility.
- * Behavior: Single-issue in-order 5-stage pipeline with forwarding, load-use hazard stalling, and machine-mode trap/CSR support.
+ * Behavior: Single-issue in-order 5-stage pipeline with forwarding, load-use hazard stalling, machine-mode trap/CSR support, and RV64M operations.
  * Reset: Active-high synchronous reset for stage state elements.
- * Pipeline control: Handles branch/jump and trap redirects, load-use bubbles, and memory backpressure.
+ * Pipeline control: Handles branch/jump and trap redirects, load-use bubbles, divide busy stalls, and memory backpressure.
  * Corner cases: Trap/mret redirects override EX redirects; forwarding never sources x0.
  */
 module core_top #(
@@ -127,6 +127,18 @@ module core_top #(
     logic [63:0] ex_rs1_data_fwd;
     logic [63:0] ex_rs2_data_fwd;
     logic [63:0] ex_csr_wdata;
+    logic        ex_is_mul;
+    logic        ex_is_div;
+    logic        ex_m_stall;
+    logic        ex_m_flush;
+    logic        ex_m_result_valid;
+    logic [63:0] ex_m_result;
+    logic [63:0] ex_result_final;
+    logic        ex_valid_to_mem;
+    logic        mul_op_valid;
+    logic [63:0] mul_result;
+    logic        div_op_valid;
+    logic [63:0] div_result;
 
     logic [63:0] mem_pc;
     logic [31:0] mem_instr;
@@ -445,6 +457,57 @@ module core_top #(
     );
 
     assign ex_redirect_valid = ex_valid && ex_branch_taken_raw;
+    assign ex_m_flush = ex_redirect_valid || trap_redirect_valid;
+
+    mul_unit u_mul_unit (
+        .opcode(ex_opcode),
+        .funct3(ex_funct3),
+        .funct7(ex_funct7),
+        .rs1_data(ex_rs1_data_fwd),
+        .rs2_data(ex_rs2_data_fwd),
+        .op_valid(mul_op_valid),
+        .result(mul_result)
+    );
+
+    div_unit u_div_unit (
+        .opcode(ex_opcode),
+        .funct3(ex_funct3),
+        .funct7(ex_funct7),
+        .rs1_data(ex_rs1_data_fwd),
+        .rs2_data(ex_rs2_data_fwd),
+        .op_valid(div_op_valid),
+        .result(div_result)
+    );
+
+    assign ex_is_mul = ex_valid && mul_op_valid;
+    assign ex_is_div = ex_valid && div_op_valid;
+
+    m_ext_ctrl u_m_ext_ctrl (
+        .clk(clk),
+        .rst(rst),
+        .flush(ex_m_flush),
+        .ex_valid(ex_valid),
+        .ex_is_mul(ex_is_mul),
+        .ex_is_div(ex_is_div),
+        .mul_result(mul_result),
+        .div_result(div_result),
+        .ex_busy_stall(ex_m_stall),
+        .m_result_valid(ex_m_result_valid),
+        .m_result(ex_m_result)
+    );
+
+    always_comb begin
+        ex_result_final = ex_alu_result;
+        ex_valid_to_mem = ex_valid;
+
+        if (ex_is_mul || ex_is_div) begin
+            ex_result_final = ex_m_result;
+        end
+
+        if (ex_is_div) begin
+            ex_valid_to_mem = ex_m_result_valid;
+        end
+    end
 
     ex_mem_reg u_ex_mem_reg (
         .clk(clk),
@@ -453,7 +516,7 @@ module core_top #(
         .flush(ex_mem_flush),
         .pc_in(ex_pc),
         .instr_in(ex_instr),
-        .alu_result_in(ex_alu_result),
+        .alu_result_in(ex_result_final),
         .rs2_data_in(ex_rs2_data_fwd),
         .csr_wdata_in(ex_csr_wdata),
         .rd_in(ex_rd),
@@ -472,7 +535,7 @@ module core_top #(
         .is_word_op_in(ex_is_word_op),
         .branch_taken_in(ex_redirect_valid),
         .branch_target_in(ex_branch_target_raw),
-        .valid_in(ex_valid),
+        .valid_in(ex_valid_to_mem),
         .pc_out(mem_pc),
         .instr_out(mem_instr),
         .alu_result_out(mem_alu_result),
@@ -701,6 +764,7 @@ module core_top #(
         .wb_redirect_valid(trap_redirect_valid),
         .wb_redirect_pc(trap_redirect_pc),
         .mem_stall(lsu_mem_stall),
+        .ex_busy_stall(ex_m_stall),
         .load_use_stall(load_use_stall),
         .if_stage_stall(if_stage_stall),
         .if_stage_flush(if_stage_flush),

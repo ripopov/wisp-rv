@@ -6,7 +6,7 @@ Current integration entrypoint:
 
 - `Makefile` (Verilator + cocotb for `core_top`)
 - `test_core_top_integration.py` (builds assembly program with `riscv64-unknown-elf-gcc` and runs end-to-end)
-- `programs/stage8_smoke.S` (Stage-08 CSR/trap smoke program)
+- `programs/stage9_smoke.S` (Stage-09 CSR/trap/M-extension smoke program)
 
 Run integration test:
 

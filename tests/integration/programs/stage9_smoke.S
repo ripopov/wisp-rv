@@ -73,6 +73,92 @@ after_ro_write:
     csrrs x23, mscratch, x0
     sd x23, 0x190(x0)
 
+    # M-extension multiply checks.
+    addi x28, x0, 6
+    addi x29, x0, 7
+    mul x30, x28, x29
+    sd x30, 0x198(x0)
+
+    addi x28, x0, -3
+    addi x29, x0, 5
+    mulh x30, x28, x29
+    sd x30, 0x1a0(x0)
+    mulhsu x30, x28, x29
+    sd x30, 0x1a8(x0)
+
+    addi x28, x0, -1
+    addi x29, x0, 2
+    mulhu x30, x28, x29
+    sd x30, 0x1b0(x0)
+    mulw x30, x28, x29
+    sd x30, 0x1b8(x0)
+
+    # M-extension divide/remainder checks.
+    addi x28, x0, 100
+    addi x29, x0, 7
+    div x30, x28, x29
+    sd x30, 0x1c0(x0)
+
+    addi x29, x0, 0
+    div x30, x28, x29
+    sd x30, 0x1c8(x0)
+
+    addi x28, x0, 1
+    slli x28, x28, 63
+    addi x29, x0, -1
+    div x30, x28, x29
+    sd x30, 0x1d0(x0)
+
+    addi x28, x0, -1
+    addi x29, x0, 3
+    divu x30, x28, x29
+    sd x30, 0x1d8(x0)
+
+    addi x28, x0, -9
+    addi x29, x0, 2
+    rem x30, x28, x29
+    sd x30, 0x1e0(x0)
+
+    addi x28, x0, -1
+    addi x29, x0, 3
+    remu x30, x28, x29
+    sd x30, 0x1e8(x0)
+
+    addi x28, x0, -9
+    addi x29, x0, 2
+    divw x30, x28, x29
+    sd x30, 0x1f0(x0)
+
+    addi x28, x0, -2
+    addi x29, x0, 3
+    divuw x30, x28, x29
+    sd x30, 0x1f8(x0)
+
+    addi x29, x0, 0
+    divuw x30, x28, x29
+    sd x30, 0x210(x0)
+
+    addi x28, x0, -9
+    addi x29, x0, 2
+    remw x30, x28, x29
+    sd x30, 0x218(x0)
+
+    addi x28, x0, -2
+    addi x29, x0, 3
+    remuw x30, x28, x29
+    sd x30, 0x220(x0)
+
+    addi x29, x0, 0
+    remuw x30, x28, x29
+    sd x30, 0x228(x0)
+
+    # Divide-result dependency check.
+    addi x28, x0, 100
+    addi x29, x0, 7
+    div x30, x28, x29
+    addi x31, x30, 1
+    sd x31, 0x230(x0)
+
     # Signal completion via tohost.
     addi x24, x0, 0x200
     addi x25, x0, 1

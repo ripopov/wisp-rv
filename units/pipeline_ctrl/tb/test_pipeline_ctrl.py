@@ -12,6 +12,7 @@ def model_pipeline_ctrl(
     wb_redirect_valid: int,
     wb_redirect_pc: int,
     mem_stall: int,
+    ex_busy_stall: int,
     load_use_stall: int,
 ) -> dict[str, int]:
     out = {
@@ -30,6 +31,7 @@ def model_pipeline_ctrl(
     }
 
     redirect_any = 1 if (wb_redirect_valid or ex_redirect_valid) else 0
+    ex_busy_stall_effective = 1 if (ex_busy_stall and not redirect_any) else 0
     load_use_stall_effective = 1 if (load_use_stall and not redirect_any) else 0
 
     if wb_redirect_valid:
@@ -44,6 +46,10 @@ def model_pipeline_ctrl(
         out["if_id_stall"] = 1
         out["id_ex_stall"] = 1
         out["ex_mem_stall"] = 1
+    elif ex_busy_stall_effective:
+        out["if_stage_stall"] = 1
+        out["if_id_stall"] = 1
+        out["id_ex_stall"] = 1
     elif load_use_stall_effective:
         out["if_stage_stall"] = 1
         out["if_id_stall"] = 1
@@ -71,6 +77,7 @@ async def check_case(
     wb_redirect_valid: int,
     wb_redirect_pc: int,
     mem_stall: int,
+    ex_busy_stall: int,
     load_use_stall: int,
     name: str,
 ) -> None:
@@ -79,6 +86,7 @@ async def check_case(
     dut.wb_redirect_valid.value = wb_redirect_valid
     dut.wb_redirect_pc.value = wb_redirect_pc & MASK64
     dut.mem_stall.value = mem_stall
+    dut.ex_busy_stall.value = ex_busy_stall
     dut.load_use_stall.value = load_use_stall
     await Timer(1, unit="ns")
 
@@ -88,6 +96,7 @@ async def check_case(
         wb_redirect_valid,
         wb_redirect_pc,
         mem_stall,
+        ex_busy_stall,
         load_use_stall,
     )
 
@@ -118,15 +127,18 @@ async def check_case(
 @cocotb.test()
 async def test_pipeline_ctrl_directed(dut):
     vectors = [
-        ("IDLE", 0, 0x0, 0, 0x0, 0, 0),
-        ("LOAD_USE_ONLY", 0, 0x0, 0, 0x0, 0, 1),
-        ("MEM_STALL_ONLY", 0, 0x1234, 0, 0x0, 1, 0),
-        ("EX_REDIRECT_ONLY", 1, 0x1000, 0, 0x0, 0, 0),
-        ("WB_REDIRECT_ONLY", 0, 0x0, 1, 0x9000, 0, 0),
-        ("EX_REDIRECT_AND_MEM_STALL", 1, 0x2000, 0, 0x0, 1, 0),
-        ("EX_REDIRECT_WINS_OVER_LOAD_USE", 1, 0x3000, 0, 0x0, 0, 1),
-        ("WB_REDIRECT_WINS_OVER_EX", 1, 0x1111, 1, 0x2222, 0, 0),
-        ("WB_REDIRECT_WINS_OVER_LOAD_USE", 0, 0x0, 1, 0x4444, 0, 1),
+        ("IDLE", 0, 0x0, 0, 0x0, 0, 0, 0),
+        ("LOAD_USE_ONLY", 0, 0x0, 0, 0x0, 0, 0, 1),
+        ("EX_BUSY_ONLY", 0, 0x0, 0, 0x0, 0, 1, 0),
+        ("MEM_STALL_ONLY", 0, 0x1234, 0, 0x0, 1, 0, 0),
+        ("EX_REDIRECT_ONLY", 1, 0x1000, 0, 0x0, 0, 0, 0),
+        ("WB_REDIRECT_ONLY", 0, 0x0, 1, 0x9000, 0, 0, 0),
+        ("EX_REDIRECT_AND_MEM_STALL", 1, 0x2000, 0, 0x0, 1, 0, 0),
+        ("MEM_STALL_WINS_OVER_EX_BUSY", 0, 0x0, 0, 0x0, 1, 1, 0),
+        ("EX_REDIRECT_WINS_OVER_EX_BUSY", 1, 0x3333, 0, 0x0, 0, 1, 0),
+        ("EX_REDIRECT_WINS_OVER_LOAD_USE", 1, 0x3000, 0, 0x0, 0, 0, 1),
+        ("WB_REDIRECT_WINS_OVER_EX", 1, 0x1111, 1, 0x2222, 0, 0, 0),
+        ("WB_REDIRECT_WINS_OVER_LOAD_USE", 0, 0x0, 1, 0x4444, 0, 0, 1),
     ]
 
     for (
@@ -136,6 +148,7 @@ async def test_pipeline_ctrl_directed(dut):
         wb_redirect_valid,
         wb_redirect_pc,
         mem_stall,
+        ex_busy_stall,
         load_use_stall,
     ) in vectors:
         await check_case(
@@ -145,6 +158,7 @@ async def test_pipeline_ctrl_directed(dut):
             wb_redirect_valid,
             wb_redirect_pc,
             mem_stall,
+            ex_busy_stall,
             load_use_stall,
             name,
         )
@@ -160,6 +174,7 @@ async def test_pipeline_ctrl_randomized(dut):
         wb_redirect_valid = random.getrandbits(1)
         wb_redirect_pc = random.getrandbits(64)
         mem_stall = random.getrandbits(1)
+        ex_busy_stall = random.getrandbits(1)
         load_use_stall = random.getrandbits(1)
         await check_case(
             dut,
@@ -168,6 +183,7 @@ async def test_pipeline_ctrl_randomized(dut):
             wb_redirect_valid,
             wb_redirect_pc,
             mem_stall,
+            ex_busy_stall,
             load_use_stall,
             f"RAND_{idx}",
         )

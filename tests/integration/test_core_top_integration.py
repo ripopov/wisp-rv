@@ -57,19 +57,19 @@ def build_program() -> dict[int, int]:
     tools = require_toolchain()
 
     root = Path(__file__).resolve().parent
-    src = root / "programs" / "stage8_smoke.S"
+    src = root / "programs" / "stage9_smoke.S"
     linker = root / "linker.ld"
 
-    with tempfile.TemporaryDirectory(prefix="wisp-rv64-stage8-") as tmpdir:
+    with tempfile.TemporaryDirectory(prefix="wisp-rv64-stage9-") as tmpdir:
         out = Path(tmpdir)
-        elf = out / "stage8_smoke.elf"
-        bin_path = out / "stage8_smoke.bin"
-        map_path = out / "stage8_smoke.map"
-        dump_path = out / "stage8_smoke.dump"
+        elf = out / "stage9_smoke.elf"
+        bin_path = out / "stage9_smoke.bin"
+        map_path = out / "stage9_smoke.map"
+        dump_path = out / "stage9_smoke.dump"
 
         gcc_cmd = [
             tools["riscv64-unknown-elf-gcc"],
-            "-march=rv64i_zicsr",
+            "-march=rv64im_zicsr",
             "-mabi=lp64",
             "-ffreestanding",
             "-nostdlib",
@@ -124,7 +124,7 @@ async def reset_dut(dut, cycles: int = 5) -> None:
 
 
 @cocotb.test()
-async def test_stage8_program_end_to_end(dut):
+async def test_stage9_program_end_to_end(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset_dut(dut)
 
@@ -206,3 +206,23 @@ async def test_stage8_program_end_to_end(dut):
     assert read_u64(dmem, 0x180) == AFTER_RO_WRITE_PC
     assert read_u64(dmem, 0x188) == expected_ro_write_mtval
     assert read_u64(dmem, 0x190) == 3
+
+    assert read_u64(dmem, 0x198) == 42
+    assert read_u64(dmem, 0x1A0) == 0xFFFF_FFFF_FFFF_FFFF
+    assert read_u64(dmem, 0x1A8) == 0xFFFF_FFFF_FFFF_FFFF
+    assert read_u64(dmem, 0x1B0) == 1
+    assert read_u64(dmem, 0x1B8) == 0xFFFF_FFFF_FFFF_FFFE
+
+    assert read_u64(dmem, 0x1C0) == 14
+    assert read_u64(dmem, 0x1C8) == 0xFFFF_FFFF_FFFF_FFFF
+    assert read_u64(dmem, 0x1D0) == 0x8000_0000_0000_0000
+    assert read_u64(dmem, 0x1D8) == 0x5555_5555_5555_5555
+    assert read_u64(dmem, 0x1E0) == 0xFFFF_FFFF_FFFF_FFFF
+    assert read_u64(dmem, 0x1E8) == 0
+    assert read_u64(dmem, 0x1F0) == 0xFFFF_FFFF_FFFF_FFFC
+    assert read_u64(dmem, 0x1F8) == 0x0000_0000_5555_5554
+    assert read_u64(dmem, 0x210) == 0xFFFF_FFFF_FFFF_FFFF
+    assert read_u64(dmem, 0x218) == 0xFFFF_FFFF_FFFF_FFFF
+    assert read_u64(dmem, 0x220) == 2
+    assert read_u64(dmem, 0x228) == 0xFFFF_FFFF_FFFF_FFFE
+    assert read_u64(dmem, 0x230) == 15

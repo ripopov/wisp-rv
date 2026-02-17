@@ -4,8 +4,8 @@
  * Interface: EX and WB redirect requests plus stall requests in; per-stage stall/flush and redirect outputs out.
  * Behavior: Pure combinational control with deterministic flush-over-stall priority.
  * Reset: Not applicable (combinational module).
- * Pipeline control: Redirects flush younger instructions, load-use inserts one EX bubble, memory stalls freeze upstream flow.
- * Corner cases: WB redirect has priority over EX redirect and masks load-use stalls.
+ * Pipeline control: Redirects flush younger instructions, load-use inserts one EX bubble, EX-busy and memory stalls freeze upstream flow.
+ * Corner cases: WB redirect has priority over EX redirect and masks load-use/EX-busy stalls.
  */
 module pipeline_ctrl (
     input  logic        ex_redirect_valid,
@@ -13,6 +13,7 @@ module pipeline_ctrl (
     input  logic        wb_redirect_valid,
     input  logic [63:0] wb_redirect_pc,
     input  logic        mem_stall,
+    input  logic        ex_busy_stall,
     input  logic        load_use_stall,
 
     output logic        if_stage_stall,
@@ -29,10 +30,12 @@ module pipeline_ctrl (
     output logic        redirect_valid,
     output logic [63:0] redirect_pc
 );
+    logic ex_busy_stall_effective;
     logic load_use_stall_effective;
     logic redirect_any;
 
     assign redirect_any = wb_redirect_valid || ex_redirect_valid;
+    assign ex_busy_stall_effective = ex_busy_stall && !redirect_any;
     assign load_use_stall_effective = load_use_stall && !redirect_any;
 
     always_comb begin
@@ -63,6 +66,10 @@ module pipeline_ctrl (
             if_id_stall = 1'b1;
             id_ex_stall = 1'b1;
             ex_mem_stall = 1'b1;
+        end else if (ex_busy_stall_effective) begin
+            if_stage_stall = 1'b1;
+            if_id_stall = 1'b1;
+            id_ex_stall = 1'b1;
         end else if (load_use_stall_effective) begin
             if_stage_stall = 1'b1;
             if_id_stall = 1'b1;

@@ -37,14 +37,18 @@ module instr_decoder (
             OP: begin
                 instr_format = R_TYPE;
                 unique case (funct3)
-                    F3_ADD_SUB: is_valid = (funct7 == 7'b0000000) || (funct7 == 7'b0100000);
-                    F3_SLL:     is_valid = (funct7 == 7'b0000000);
-                    F3_SLT:     is_valid = (funct7 == 7'b0000000);
-                    F3_SLTU:    is_valid = (funct7 == 7'b0000000);
-                    F3_XOR:     is_valid = (funct7 == 7'b0000000);
-                    F3_SRL_SRA: is_valid = (funct7 == 7'b0000000) || (funct7 == 7'b0100000);
-                    F3_OR:      is_valid = (funct7 == 7'b0000000);
-                    F3_AND:     is_valid = (funct7 == 7'b0000000);
+                    F3_ADD_SUB: is_valid = (funct7 == 7'b0000000) ||
+                                           (funct7 == 7'b0100000) ||
+                                           (funct7 == F7_M_EXT);
+                    F3_SLL:     is_valid = (funct7 == 7'b0000000) || (funct7 == F7_M_EXT);
+                    F3_SLT:     is_valid = (funct7 == 7'b0000000) || (funct7 == F7_M_EXT);
+                    F3_SLTU:    is_valid = (funct7 == 7'b0000000) || (funct7 == F7_M_EXT);
+                    F3_XOR:     is_valid = (funct7 == 7'b0000000) || (funct7 == F7_M_EXT);
+                    F3_SRL_SRA: is_valid = (funct7 == 7'b0000000) ||
+                                           (funct7 == 7'b0100000) ||
+                                           (funct7 == F7_M_EXT);
+                    F3_OR:      is_valid = (funct7 == 7'b0000000) || (funct7 == F7_M_EXT);
+                    F3_AND:     is_valid = (funct7 == 7'b0000000) || (funct7 == F7_M_EXT);
                     default:    is_valid = 1'b0;
                 endcase
             end
@@ -52,9 +56,16 @@ module instr_decoder (
             OP_32: begin
                 instr_format = R_TYPE;
                 unique case (funct3)
-                    F3_ADD_SUB: is_valid = (funct7 == 7'b0000000) || (funct7 == 7'b0100000);
+                    F3_ADD_SUB: is_valid = (funct7 == 7'b0000000) ||
+                                           (funct7 == 7'b0100000) ||
+                                           (funct7 == F7_M_EXT);
                     F3_SLL:     is_valid = (funct7 == 7'b0000000);
-                    F3_SRL_SRA: is_valid = (funct7 == 7'b0000000) || (funct7 == 7'b0100000);
+                    F3_XOR:     is_valid = (funct7 == F7_M_EXT);
+                    F3_SRL_SRA: is_valid = (funct7 == 7'b0000000) ||
+                                           (funct7 == 7'b0100000) ||
+                                           (funct7 == F7_M_EXT);
+                    F3_OR:      is_valid = (funct7 == F7_M_EXT);
+                    F3_AND:     is_valid = (funct7 == F7_M_EXT);
                     default:    is_valid = 1'b0;
                 endcase
             end

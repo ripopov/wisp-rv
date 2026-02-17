@@ -32,6 +32,7 @@ package rv64_pkg;
     localparam logic [2:0] F3_SRL_SRA = 3'b101;
     localparam logic [2:0] F3_OR      = 3'b110;
     localparam logic [2:0] F3_AND     = 3'b111;
+    localparam logic [6:0] F7_M_EXT   = 7'b0000001;
 
     // Load funct3 fields.
     localparam logic [2:0] F3_LB      = 3'b000;

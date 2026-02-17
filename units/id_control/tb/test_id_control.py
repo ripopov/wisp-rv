@@ -16,6 +16,7 @@ JAL = 0b1101111
 JALR = 0b1100111
 SYSTEM = 0b1110011
 FENCE = 0b0001111
+F7_M_EXT = 0b0000001
 
 ALU_ADD = 0x0
 ALU_SUB = 0x1
@@ -67,27 +68,61 @@ def model_ctrl(opcode: int, funct3: int, funct7: int) -> tuple[int, ...]:
                 ctrl[0] = ALU_ADD
             elif funct7 == 0b0100000:
                 ctrl[0] = ALU_SUB
+            elif funct7 == F7_M_EXT:
+                ctrl[0] = ALU_ADD
             else:
                 valid = False
-        elif funct3 == 0b001 and funct7 == 0b0000000:
-            ctrl[0] = ALU_SLL
-        elif funct3 == 0b010 and funct7 == 0b0000000:
-            ctrl[0] = ALU_SLT
-        elif funct3 == 0b011 and funct7 == 0b0000000:
-            ctrl[0] = ALU_SLTU
-        elif funct3 == 0b100 and funct7 == 0b0000000:
-            ctrl[0] = ALU_XOR
+        elif funct3 == 0b001:
+            if funct7 == 0b0000000:
+                ctrl[0] = ALU_SLL
+            elif funct7 == F7_M_EXT:
+                ctrl[0] = ALU_ADD
+            else:
+                valid = False
+        elif funct3 == 0b010:
+            if funct7 == 0b0000000:
+                ctrl[0] = ALU_SLT
+            elif funct7 == F7_M_EXT:
+                ctrl[0] = ALU_ADD
+            else:
+                valid = False
+        elif funct3 == 0b011:
+            if funct7 == 0b0000000:
+                ctrl[0] = ALU_SLTU
+            elif funct7 == F7_M_EXT:
+                ctrl[0] = ALU_ADD
+            else:
+                valid = False
+        elif funct3 == 0b100:
+            if funct7 == 0b0000000:
+                ctrl[0] = ALU_XOR
+            elif funct7 == F7_M_EXT:
+                ctrl[0] = ALU_ADD
+            else:
+                valid = False
         elif funct3 == 0b101:
             if funct7 == 0b0000000:
                 ctrl[0] = ALU_SRL
             elif funct7 == 0b0100000:
                 ctrl[0] = ALU_SRA
+            elif funct7 == F7_M_EXT:
+                ctrl[0] = ALU_ADD
             else:
                 valid = False
-        elif funct3 == 0b110 and funct7 == 0b0000000:
-            ctrl[0] = ALU_OR
-        elif funct3 == 0b111 and funct7 == 0b0000000:
-            ctrl[0] = ALU_AND
+        elif funct3 == 0b110:
+            if funct7 == 0b0000000:
+                ctrl[0] = ALU_OR
+            elif funct7 == F7_M_EXT:
+                ctrl[0] = ALU_ADD
+            else:
+                valid = False
+        elif funct3 == 0b111:
+            if funct7 == 0b0000000:
+                ctrl[0] = ALU_AND
+            elif funct7 == F7_M_EXT:
+                ctrl[0] = ALU_ADD
+            else:
+                valid = False
         else:
             valid = False
 
@@ -99,6 +134,8 @@ def model_ctrl(opcode: int, funct3: int, funct7: int) -> tuple[int, ...]:
                 ctrl[0] = ALU_ADD
             elif funct7 == 0b0100000:
                 ctrl[0] = ALU_SUB
+            elif funct7 == F7_M_EXT:
+                ctrl[0] = ALU_ADD
             else:
                 valid = False
         elif funct3 == 0b001:
@@ -106,11 +143,23 @@ def model_ctrl(opcode: int, funct3: int, funct7: int) -> tuple[int, ...]:
                 ctrl[0] = ALU_SLL
             else:
                 valid = False
+        elif funct3 == 0b100:
+            if funct7 == F7_M_EXT:
+                ctrl[0] = ALU_ADD
+            else:
+                valid = False
         elif funct3 == 0b101:
             if funct7 == 0b0000000:
                 ctrl[0] = ALU_SRL
             elif funct7 == 0b0100000:
                 ctrl[0] = ALU_SRA
+            elif funct7 == F7_M_EXT:
+                ctrl[0] = ALU_ADD
+            else:
+                valid = False
+        elif funct3 in (0b110, 0b111):
+            if funct7 == F7_M_EXT:
+                ctrl[0] = ALU_ADD
             else:
                 valid = False
         else:
@@ -273,6 +322,14 @@ async def test_directed_control_decode(dut):
         ("AND", OP, 0b111, 0b0000000, ctrl_tuple(alu_op=ALU_AND, reg_write=1)),
         ("SRL", OP, 0b101, 0b0000000, ctrl_tuple(alu_op=ALU_SRL, reg_write=1)),
         ("SRA", OP, 0b101, 0b0100000, ctrl_tuple(alu_op=ALU_SRA, reg_write=1)),
+        ("MUL", OP, 0b000, F7_M_EXT, ctrl_tuple(alu_op=ALU_ADD, reg_write=1)),
+        ("MULH", OP, 0b001, F7_M_EXT, ctrl_tuple(alu_op=ALU_ADD, reg_write=1)),
+        ("MULHSU", OP, 0b010, F7_M_EXT, ctrl_tuple(alu_op=ALU_ADD, reg_write=1)),
+        ("MULHU", OP, 0b011, F7_M_EXT, ctrl_tuple(alu_op=ALU_ADD, reg_write=1)),
+        ("DIV", OP, 0b100, F7_M_EXT, ctrl_tuple(alu_op=ALU_ADD, reg_write=1)),
+        ("DIVU", OP, 0b101, F7_M_EXT, ctrl_tuple(alu_op=ALU_ADD, reg_write=1)),
+        ("REM", OP, 0b110, F7_M_EXT, ctrl_tuple(alu_op=ALU_ADD, reg_write=1)),
+        ("REMU", OP, 0b111, F7_M_EXT, ctrl_tuple(alu_op=ALU_ADD, reg_write=1)),
         (
             "ADDW",
             OP_32,
@@ -286,6 +343,41 @@ async def test_directed_control_decode(dut):
             0b101,
             0b0100000,
             ctrl_tuple(alu_op=ALU_SRA, reg_write=1, is_word_op=1),
+        ),
+        (
+            "MULW",
+            OP_32,
+            0b000,
+            F7_M_EXT,
+            ctrl_tuple(alu_op=ALU_ADD, reg_write=1, is_word_op=1),
+        ),
+        (
+            "DIVW",
+            OP_32,
+            0b100,
+            F7_M_EXT,
+            ctrl_tuple(alu_op=ALU_ADD, reg_write=1, is_word_op=1),
+        ),
+        (
+            "DIVUW",
+            OP_32,
+            0b101,
+            F7_M_EXT,
+            ctrl_tuple(alu_op=ALU_ADD, reg_write=1, is_word_op=1),
+        ),
+        (
+            "REMW",
+            OP_32,
+            0b110,
+            F7_M_EXT,
+            ctrl_tuple(alu_op=ALU_ADD, reg_write=1, is_word_op=1),
+        ),
+        (
+            "REMUW",
+            OP_32,
+            0b111,
+            F7_M_EXT,
+            ctrl_tuple(alu_op=ALU_ADD, reg_write=1, is_word_op=1),
         ),
         (
             "ADDI",
@@ -511,6 +603,7 @@ async def test_invalid_combinations_zero_controls(dut):
         ("UNKNOWN_OPCODE", 0b0000000, 0b000, 0b0000000),
         ("OP_BAD_FUNCT7", OP, 0b001, 0b0100000),
         ("OP32_BAD_FUNCT3", OP_32, 0b100, 0b0000000),
+        ("OP32_M_BAD_FUNCT3", OP_32, 0b001, F7_M_EXT),
         ("OPIMM_BAD_SLLI", OP_IMM, 0b001, 0b0000010),
         ("OPIMM32_BAD_SHIFT", OP_IMM_32, 0b101, 0b0110000),
         ("LOAD_BAD_FUNCT3", LOAD, 0b111, 0),

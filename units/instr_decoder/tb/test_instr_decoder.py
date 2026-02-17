@@ -18,6 +18,7 @@ JAL = 0b1101111
 JALR = 0b1100111
 SYSTEM = 0b1110011
 FENCE = 0b0001111
+F7_M_EXT = 0b0000001
 
 FMT_R = 0
 FMT_I = 1
@@ -104,19 +105,23 @@ def model_decode(instr: int) -> tuple[int, int]:
     if opcode == OP:
         fmt = FMT_R
         if funct3 == 0b000:
-            valid = funct7 in (0b0000000, 0b0100000)
+            valid = funct7 in (0b0000000, 0b0100000, F7_M_EXT)
         elif funct3 in (0b001, 0b010, 0b011, 0b100, 0b110, 0b111):
-            valid = funct7 == 0b0000000
+            valid = funct7 in (0b0000000, F7_M_EXT)
         elif funct3 == 0b101:
-            valid = funct7 in (0b0000000, 0b0100000)
+            valid = funct7 in (0b0000000, 0b0100000, F7_M_EXT)
     elif opcode == OP_32:
         fmt = FMT_R
         if funct3 == 0b000:
-            valid = funct7 in (0b0000000, 0b0100000)
+            valid = funct7 in (0b0000000, 0b0100000, F7_M_EXT)
         elif funct3 == 0b001:
             valid = funct7 == 0b0000000
+        elif funct3 == 0b100:
+            valid = funct7 == F7_M_EXT
         elif funct3 == 0b101:
-            valid = funct7 in (0b0000000, 0b0100000)
+            valid = funct7 in (0b0000000, 0b0100000, F7_M_EXT)
+        elif funct3 in (0b110, 0b111):
+            valid = funct7 == F7_M_EXT
     elif opcode == OP_IMM:
         fmt = FMT_I
         if funct3 in (0b000, 0b010, 0b011, 0b100, 0b110, 0b111):
@@ -198,6 +203,14 @@ async def test_decode_all_rv64i_encodings(dut):
         ("SRA", enc_r(0b0100000, 9, 8, 0b101, 7, OP), FMT_R),
         ("OR", enc_r(0b0000000, 9, 8, 0b110, 7, OP), FMT_R),
         ("AND", enc_r(0b0000000, 9, 8, 0b111, 7, OP), FMT_R),
+        ("MUL", enc_r(F7_M_EXT, 9, 8, 0b000, 7, OP), FMT_R),
+        ("MULH", enc_r(F7_M_EXT, 9, 8, 0b001, 7, OP), FMT_R),
+        ("MULHSU", enc_r(F7_M_EXT, 9, 8, 0b010, 7, OP), FMT_R),
+        ("MULHU", enc_r(F7_M_EXT, 9, 8, 0b011, 7, OP), FMT_R),
+        ("DIV", enc_r(F7_M_EXT, 9, 8, 0b100, 7, OP), FMT_R),
+        ("DIVU", enc_r(F7_M_EXT, 9, 8, 0b101, 7, OP), FMT_R),
+        ("REM", enc_r(F7_M_EXT, 9, 8, 0b110, 7, OP), FMT_R),
+        ("REMU", enc_r(F7_M_EXT, 9, 8, 0b111, 7, OP), FMT_R),
     ]
 
     # OP-32 (R-type, RV64 only)
@@ -207,6 +220,11 @@ async def test_decode_all_rv64i_encodings(dut):
         ("SLLW", enc_r(0b0000000, 9, 8, 0b001, 7, OP_32), FMT_R),
         ("SRLW", enc_r(0b0000000, 9, 8, 0b101, 7, OP_32), FMT_R),
         ("SRAW", enc_r(0b0100000, 9, 8, 0b101, 7, OP_32), FMT_R),
+        ("MULW", enc_r(F7_M_EXT, 9, 8, 0b000, 7, OP_32), FMT_R),
+        ("DIVW", enc_r(F7_M_EXT, 9, 8, 0b100, 7, OP_32), FMT_R),
+        ("DIVUW", enc_r(F7_M_EXT, 9, 8, 0b101, 7, OP_32), FMT_R),
+        ("REMW", enc_r(F7_M_EXT, 9, 8, 0b110, 7, OP_32), FMT_R),
+        ("REMUW", enc_r(F7_M_EXT, 9, 8, 0b111, 7, OP_32), FMT_R),
     ]
 
     # OP-IMM (I-type)
@@ -284,6 +302,7 @@ async def test_illegal_instruction_detection(dut):
         ("UNKNOWN_OPCODE", 0x00000000),
         ("OP_BAD_FUNCT7", enc_r(0b1111111, 9, 8, 0b000, 7, OP)),
         ("OP_SLL_BAD_FUNCT7", enc_r(0b0100000, 9, 8, 0b001, 7, OP)),
+        ("OP32_M_BAD_FUNCT3", enc_r(F7_M_EXT, 9, 8, 0b001, 7, OP_32)),
         ("OP_IMM_SLLI_BAD_IMM11_6", enc_i((0b000001 << 6) | 0x01, 8, 0b001, 7, OP_IMM)),
         ("OP_IMM_SRLI_BAD_IMM11_6", enc_i((0b000001 << 6) | 0x01, 8, 0b101, 7, OP_IMM)),
         ("OP_IMM_32_SLLIW_BAD", enc_i((0b0000001 << 5) | 0x01, 8, 0b001, 7, OP_IMM_32)),

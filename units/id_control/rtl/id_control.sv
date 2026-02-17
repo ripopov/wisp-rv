@@ -34,6 +34,8 @@ module id_control (
                             ctrl_next.alu_op = ALU_OP_ADD;
                         end else if (funct7 == 7'b0100000) begin
                             ctrl_next.alu_op = ALU_OP_SUB;
+                        end else if (funct7 == F7_M_EXT) begin
+                            ctrl_next.alu_op = ALU_OP_ADD;
                         end else begin
                             valid = 1'b0;
                         end
@@ -41,6 +43,8 @@ module id_control (
                     F3_SLL: begin
                         if (funct7 == 7'b0000000) begin
                             ctrl_next.alu_op = ALU_OP_SLL;
+                        end else if (funct7 == F7_M_EXT) begin
+                            ctrl_next.alu_op = ALU_OP_ADD;
                         end else begin
                             valid = 1'b0;
                         end
@@ -48,6 +52,8 @@ module id_control (
                     F3_SLT: begin
                         if (funct7 == 7'b0000000) begin
                             ctrl_next.alu_op = ALU_OP_SLT;
+                        end else if (funct7 == F7_M_EXT) begin
+                            ctrl_next.alu_op = ALU_OP_ADD;
                         end else begin
                             valid = 1'b0;
                         end
@@ -55,6 +61,8 @@ module id_control (
                     F3_SLTU: begin
                         if (funct7 == 7'b0000000) begin
                             ctrl_next.alu_op = ALU_OP_SLTU;
+                        end else if (funct7 == F7_M_EXT) begin
+                            ctrl_next.alu_op = ALU_OP_ADD;
                         end else begin
                             valid = 1'b0;
                         end
@@ -62,6 +70,8 @@ module id_control (
                     F3_XOR: begin
                         if (funct7 == 7'b0000000) begin
                             ctrl_next.alu_op = ALU_OP_XOR;
+                        end else if (funct7 == F7_M_EXT) begin
+                            ctrl_next.alu_op = ALU_OP_ADD;
                         end else begin
                             valid = 1'b0;
                         end
@@ -71,6 +81,8 @@ module id_control (
                             ctrl_next.alu_op = ALU_OP_SRL;
                         end else if (funct7 == 7'b0100000) begin
                             ctrl_next.alu_op = ALU_OP_SRA;
+                        end else if (funct7 == F7_M_EXT) begin
+                            ctrl_next.alu_op = ALU_OP_ADD;
                         end else begin
                             valid = 1'b0;
                         end
@@ -78,6 +90,8 @@ module id_control (
                     F3_OR: begin
                         if (funct7 == 7'b0000000) begin
                             ctrl_next.alu_op = ALU_OP_OR;
+                        end else if (funct7 == F7_M_EXT) begin
+                            ctrl_next.alu_op = ALU_OP_ADD;
                         end else begin
                             valid = 1'b0;
                         end
@@ -85,6 +99,8 @@ module id_control (
                     F3_AND: begin
                         if (funct7 == 7'b0000000) begin
                             ctrl_next.alu_op = ALU_OP_AND;
+                        end else if (funct7 == F7_M_EXT) begin
+                            ctrl_next.alu_op = ALU_OP_ADD;
                         end else begin
                             valid = 1'b0;
                         end
@@ -103,6 +119,8 @@ module id_control (
                             ctrl_next.alu_op = ALU_OP_ADD;
                         end else if (funct7 == 7'b0100000) begin
                             ctrl_next.alu_op = ALU_OP_SUB;
+                        end else if (funct7 == F7_M_EXT) begin
+                            ctrl_next.alu_op = ALU_OP_ADD;
                         end else begin
                             valid = 1'b0;
                         end
@@ -114,11 +132,28 @@ module id_control (
                             valid = 1'b0;
                         end
                     end
+                    F3_XOR: begin
+                        if (funct7 == F7_M_EXT) begin
+                            ctrl_next.alu_op = ALU_OP_ADD;
+                        end else begin
+                            valid = 1'b0;
+                        end
+                    end
                     F3_SRL_SRA: begin
                         if (funct7 == 7'b0000000) begin
                             ctrl_next.alu_op = ALU_OP_SRL;
                         end else if (funct7 == 7'b0100000) begin
                             ctrl_next.alu_op = ALU_OP_SRA;
+                        end else if (funct7 == F7_M_EXT) begin
+                            ctrl_next.alu_op = ALU_OP_ADD;
+                        end else begin
+                            valid = 1'b0;
+                        end
+                    end
+                    F3_OR,
+                    F3_AND: begin
+                        if (funct7 == F7_M_EXT) begin
+                            ctrl_next.alu_op = ALU_OP_ADD;
                         end else begin
                             valid = 1'b0;
                         end
