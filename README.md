@@ -50,6 +50,15 @@ RV64 RISC-V core project in SystemVerilog with unit tests in Python (cocotb) and
 - Pipeline registers
   - RTL: `units/pipeline_regs/rtl/if_id_reg.sv`, `units/pipeline_regs/rtl/id_ex_reg.sv`, `units/pipeline_regs/rtl/ex_mem_reg.sv`, `units/pipeline_regs/rtl/mem_wb_reg.sv`
   - Testbench: `units/pipeline_regs/tb/test_pipeline_regs.py`
+- PC select
+  - RTL: `units/pc_select/rtl/pc_select.sv`
+  - Testbench: `units/pc_select/tb/test_pc_select.py`
+- Instruction-memory interface adapter
+  - RTL: `units/imem_if/rtl/imem_if.sv`
+  - Testbench: `units/imem_if/tb/test_imem_if.py`
+- IF stage
+  - RTL: `units/if_stage/rtl/if_stage.sv`
+  - Testbench: `units/if_stage/tb/test_if_stage.py`
 
 Setup Python dependencies (Python 3.13+):
 

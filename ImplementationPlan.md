@@ -1,6 +1,6 @@
 # Implementation Plan: Pipelined RV64 Processor
 
-Current implementation stage: **Stage 03 - Instruction fetch stage**.
+Current implementation stage: **Stage 04 - Execute stage and branch/jump control**.
 
 Assumption: all lower-numbered stages are fully implemented, all tests pass, and changes are merged before work begins on the current stage.
 
@@ -313,8 +313,8 @@ A bubble (invalid instruction) is represented by deasserting the stage's `valid`
 - [x] Stage 00 - ALU baseline
 - [x] Stage 01 - ISA and decode foundation
 - [x] Stage 02 - Register file and pipeline register set
-- [ ] Stage 03 - Instruction fetch stage  <-- current
-- [ ] Stage 04 - Execute stage and branch/jump control
+- [x] Stage 03 - Instruction fetch stage
+- [ ] Stage 04 - Execute stage and branch/jump control  <-- current
 - [ ] Stage 05 - Memory stage and load/store unit
 - [ ] Stage 06 - Core top-level integration (pipeline v1)
 - [ ] Stage 07 - Forwarding and hazard control completion
