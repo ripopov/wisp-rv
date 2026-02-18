@@ -303,6 +303,59 @@ async def test_division_directed_c_program(dut):
 
 
 @cocotb.test()
+async def test_division_directed_asm_program(dut):
+    init_tb_ports(dut)
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+
+    expected = expected_directed_words()
+
+    with tempfile.TemporaryDirectory(
+        prefix="wisp-rv64-division-directed-asm-"
+    ) as tmpdir:
+        artifacts = build_rv64_program(
+            source=THIS_DIR / "programs" / "division_directed_asm.S",
+            linker_script=THIS_DIR / "linker" / "rv64.ld",
+            output_dir=Path(tmpdir),
+            march=DEFAULT_MARCH,
+            mabi=DEFAULT_MABI,
+        )
+
+        image = load_elf_image(artifacts.elf_path)
+        await reset_and_load_elf(
+            dut,
+            image,
+            reset_cycles=2,
+            clear_words=4096,
+            load_imem=True,
+            load_dmem=True,
+        )
+
+        run = await run_until_termination(
+            dut,
+            max_cycles=1_000_000,
+            tohost_addr=TOHOST_ADDR,
+            expected_tohost=1,
+            tohost_drain_cycles=8,
+            halt_repeat_cycles=512,
+        )
+
+        assert run.tohost == 1, (
+            f"division_directed_asm: completion mismatch (tohost={run.tohost}) "
+            f"reason={run.reason} recent_if_pcs={[hex(pc) for pc in run.recent_if_pcs]}"
+        )
+
+        observed = []
+        for idx in range(len(expected)):
+            observed.append(await tb_read_u64(dut, RESULT_BASE_DIRECTED + (idx * 8)))
+
+        for idx, (got, exp) in enumerate(zip(observed, expected, strict=True)):
+            assert got == exp, (
+                f"division_directed_asm: mismatch at result[{idx}] "
+                f"expected=0x{exp:016x} got=0x{got:016x}"
+            )
+
+
+@cocotb.test()
 async def test_division_exhaustive_c_program(dut):
     init_tb_ports(dut)
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
