@@ -13,10 +13,11 @@ def _apply_store_to_u64(
     prev: int, addr: int, wdata: int, be: int, base_addr: int
 ) -> int:
     value = prev & MASK64
+    word_base = addr & ~0x7
     for byte_idx in range(8):
         if ((be >> byte_idx) & 0x1) == 0:
             continue
-        byte_addr = addr + byte_idx
+        byte_addr = word_base + byte_idx
         if byte_addr < base_addr or byte_addr > (base_addr + 7):
             continue
         dst_shift = (byte_addr - base_addr) * 8

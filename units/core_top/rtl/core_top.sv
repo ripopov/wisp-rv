@@ -147,6 +147,9 @@ module core_top #(
     logic        mul_op_valid;
     logic [63:0] mul_result;
     logic        div_op_valid;
+    logic        div_start;
+    logic        div_busy;
+    logic        div_result_valid;
     logic [63:0] div_result;
 
     logic [63:0] mem_pc;
@@ -479,12 +482,18 @@ module core_top #(
     );
 
     div_unit u_div_unit (
+        .clk(clk),
+        .rst(rst),
+        .flush(ex_m_flush),
+        .start(div_start),
         .opcode(ex_opcode),
         .funct3(ex_funct3),
         .funct7(ex_funct7),
         .rs1_data(ex_rs1_data_fwd),
         .rs2_data(ex_rs2_data_fwd),
         .op_valid(div_op_valid),
+        .busy(div_busy),
+        .result_valid(div_result_valid),
         .result(div_result)
     );
 
@@ -492,14 +501,15 @@ module core_top #(
     assign ex_is_div = ex_valid && div_op_valid;
 
     m_ext_ctrl u_m_ext_ctrl (
-        .clk(clk),
-        .rst(rst),
         .flush(ex_m_flush),
         .ex_valid(ex_valid),
         .ex_is_mul(ex_is_mul),
         .ex_is_div(ex_is_div),
         .mul_result(mul_result),
+        .div_busy(div_busy),
+        .div_result_valid(div_result_valid),
         .div_result(div_result),
+        .div_start(div_start),
         .ex_busy_stall(ex_m_stall),
         .m_result_valid(ex_m_result_valid),
         .m_result(ex_m_result)
@@ -511,9 +521,6 @@ module core_top #(
 
         if (ex_is_mul || ex_is_div) begin
             ex_result_final = ex_m_result;
-        end
-
-        if (ex_is_div) begin
             ex_valid_to_mem = ex_m_result_valid;
         end
     end

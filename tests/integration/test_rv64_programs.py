@@ -110,7 +110,7 @@ async def test_curated_rv64_program_suite(dut):
                 max_cycles=20_000,
                 tohost_addr=TOHOST_ADDR,
                 tohost_drain_cycles=8,
-                halt_repeat_cycles=48,
+                halt_repeat_cycles=256,
             )
 
             total_cycles += result.cycles

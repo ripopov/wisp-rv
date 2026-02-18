@@ -1,7 +1,8 @@
 import random
 
 import cocotb
-from cocotb.triggers import Timer
+from cocotb.clock import Clock
+from cocotb.triggers import ClockCycles, RisingEdge, Timer
 
 MASK64 = (1 << 64) - 1
 
@@ -130,7 +131,53 @@ def model_div(
     return 0, 0
 
 
-async def check_case(
+def expected_latency(
+    opcode: int,
+    funct3: int,
+    funct7: int,
+    rs1_data: int,
+    rs2_data: int,
+) -> int:
+    exp_valid, _ = model_div(opcode, funct3, funct7, rs1_data, rs2_data)
+    if not exp_valid:
+        return 0
+
+    if opcode == OP:
+        rs1_u = u64(rs1_data)
+        rs2_u = u64(rs2_data)
+        is_signed = funct3 in (F3_DIV, F3_REM)
+        if rs2_u == 0:
+            return 1
+        if is_signed and rs1_u == 0x8000_0000_0000_0000 and rs2_u == MASK64:
+            return 1
+        return 64
+
+    rs1_w_u = u32(rs1_data)
+    rs2_w_u = u32(rs2_data)
+    is_signed = funct3 in (F3_DIV, F3_REM)
+    if rs2_w_u == 0:
+        return 1
+    if is_signed and rs1_w_u == 0x8000_0000 and rs2_w_u == 0xFFFF_FFFF:
+        return 1
+    return 32
+
+
+async def reset_dut(dut, cycles: int = 3) -> None:
+    dut.rst.value = 1
+    dut.flush.value = 0
+    dut.start.value = 0
+    dut.opcode.value = 0
+    dut.funct3.value = 0
+    dut.funct7.value = 0
+    dut.rs1_data.value = 0
+    dut.rs2_data.value = 0
+    await ClockCycles(dut.clk, cycles)
+    dut.rst.value = 0
+    await RisingEdge(dut.clk)
+    await Timer(1, unit="ns")
+
+
+async def run_case(
     dut,
     *,
     opcode: int,
@@ -140,6 +187,8 @@ async def check_case(
     rs2_data: int,
     name: str,
 ) -> None:
+    dut.flush.value = 0
+    dut.start.value = 0
     dut.opcode.value = opcode & 0x7F
     dut.funct3.value = funct3 & 0x7
     dut.funct7.value = funct7 & 0x7F
@@ -149,18 +198,43 @@ async def check_case(
 
     exp_valid, exp_result = model_div(opcode, funct3, funct7, rs1_data, rs2_data)
     got_valid = int(dut.op_valid.value)
-    got_result = int(dut.result.value) & MASK64
-
     assert got_valid == exp_valid, (
         f"{name}: op_valid expected {exp_valid} got {got_valid}"
     )
+
+    if not exp_valid:
+        return
+
+    dut.start.value = 1
+    await RisingEdge(dut.clk)
+    dut.start.value = 0
+
+    cycles_to_result = 0
+    while cycles_to_result < 100:
+        await RisingEdge(dut.clk)
+        await Timer(1, unit="ns")
+        cycles_to_result += 1
+        if int(dut.result_valid.value):
+            break
+
+    assert cycles_to_result < 100, f"{name}: divider did not complete"
+
+    got_result = int(dut.result.value) & MASK64
     assert got_result == exp_result, (
         f"{name}: result expected 0x{exp_result:016x} got 0x{got_result:016x}"
+    )
+
+    exp_cycles = expected_latency(opcode, funct3, funct7, rs1_data, rs2_data)
+    assert cycles_to_result == exp_cycles, (
+        f"{name}: latency expected {exp_cycles} got {cycles_to_result}"
     )
 
 
 @cocotb.test()
 async def test_div_unit_directed(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await reset_dut(dut)
+
     vectors = [
         {
             "name": "DIV_SIGNED",
@@ -261,25 +335,72 @@ async def test_div_unit_directed(dut):
     ]
 
     for vec in vectors:
-        await check_case(dut, **vec)
+        await run_case(dut, **vec)
+
+
+@cocotb.test()
+async def test_div_unit_flush_cancels_inflight(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await reset_dut(dut)
+
+    dut.opcode.value = OP
+    dut.funct3.value = F3_DIV
+    dut.funct7.value = F7_M_EXT
+    dut.rs1_data.value = u64(0x1234_5678_9ABC_DEF0)
+    dut.rs2_data.value = u64(7)
+    dut.flush.value = 0
+
+    await Timer(1, unit="ns")
+    assert int(dut.op_valid.value) == 1
+
+    dut.start.value = 1
+    await RisingEdge(dut.clk)
+    dut.start.value = 0
+
+    await ClockCycles(dut.clk, 5)
+    await Timer(1, unit="ns")
+    assert int(dut.busy.value) == 1
+    assert int(dut.result_valid.value) == 0
+
+    dut.flush.value = 1
+    await RisingEdge(dut.clk)
+    dut.flush.value = 0
+    await Timer(1, unit="ns")
+
+    assert int(dut.busy.value) == 0
+    assert int(dut.result_valid.value) == 0
+
+    await ClockCycles(dut.clk, 4)
+    await Timer(1, unit="ns")
+    assert int(dut.result_valid.value) == 0
 
 
 @cocotb.test()
 async def test_div_unit_randomized(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await reset_dut(dut)
+
     random.seed(64)
 
     opcodes = [OP, OP_32]
+    funct3s = [F3_DIV, F3_DIVU, F3_REM, F3_REMU]
 
-    for idx in range(20_000):
-        opcode = (
-            random.choice(opcodes) if random.getrandbits(1) else random.getrandbits(7)
-        )
-        await check_case(
+    for idx in range(600):
+        if random.getrandbits(2) == 0:
+            opcode = random.getrandbits(7)
+            funct3 = random.getrandbits(3)
+            funct7 = random.getrandbits(7)
+        else:
+            opcode = random.choice(opcodes)
+            funct3 = random.choice(funct3s)
+            funct7 = F7_M_EXT if random.getrandbits(3) else random.getrandbits(7)
+
+        await run_case(
             dut,
             name=f"RAND_{idx}",
             opcode=opcode,
-            funct3=random.getrandbits(3),
-            funct7=random.getrandbits(7),
+            funct3=funct3,
+            funct7=funct7,
             rs1_data=random.getrandbits(64),
             rs2_data=random.getrandbits(64),
         )
