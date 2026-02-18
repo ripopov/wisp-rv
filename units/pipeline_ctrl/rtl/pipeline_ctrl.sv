@@ -79,7 +79,9 @@ module pipeline_ctrl (
         if (ex_redirect_valid) begin
             if_stage_flush = 1'b1;
             if_id_flush = 1'b1;
-            id_ex_flush = 1'b1;
+            if (!ex_mem_stall) begin
+                id_ex_flush = 1'b1;
+            end
         end
 
         if (wb_redirect_valid) begin

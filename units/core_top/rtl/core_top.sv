@@ -127,6 +127,12 @@ module core_top #(
     logic        ex_redirect_valid;
     logic [1:0]  forward_a_sel;
     logic [1:0]  forward_b_sel;
+    logic [63:0] ex_rs1_data_fwd_live;
+    logic [63:0] ex_rs2_data_fwd_live;
+    logic [63:0] ex_rs1_data_fwd_hold;
+    logic [63:0] ex_rs2_data_fwd_hold;
+    logic [63:0] ex_hold_pc;
+    logic        ex_hold_active;
     logic [63:0] ex_rs1_data_fwd;
     logic [63:0] ex_rs2_data_fwd;
     logic [63:0] ex_csr_wdata;
@@ -661,25 +667,58 @@ module core_top #(
     );
 
     always_comb begin
-        ex_rs1_data_fwd = ex_rs1_data;
-        ex_rs2_data_fwd = ex_rs2_data;
+        ex_rs1_data_fwd_live = ex_rs1_data;
+        ex_rs2_data_fwd_live = ex_rs2_data;
 
         unique case (forward_a_sel)
-            2'b01: ex_rs1_data_fwd = ex_mem_forward_data;
-            2'b10: ex_rs1_data_fwd = wb_data;
-            default: ex_rs1_data_fwd = ex_rs1_data;
+            2'b01: ex_rs1_data_fwd_live = ex_mem_forward_data;
+            2'b10: ex_rs1_data_fwd_live = wb_data;
+            default: ex_rs1_data_fwd_live = ex_rs1_data;
         endcase
 
         unique case (forward_b_sel)
-            2'b01: ex_rs2_data_fwd = ex_mem_forward_data;
-            2'b10: ex_rs2_data_fwd = wb_data;
-            default: ex_rs2_data_fwd = ex_rs2_data;
+            2'b01: ex_rs2_data_fwd_live = ex_mem_forward_data;
+            2'b10: ex_rs2_data_fwd_live = wb_data;
+            default: ex_rs2_data_fwd_live = ex_rs2_data;
         endcase
+
+        ex_rs1_data_fwd = ex_rs1_data_fwd_live;
+        ex_rs2_data_fwd = ex_rs2_data_fwd_live;
+
+        if (ex_hold_active && (ex_pc == ex_hold_pc)) begin
+            ex_rs1_data_fwd = ex_rs1_data_fwd_hold;
+            ex_rs2_data_fwd = ex_rs2_data_fwd_hold;
+        end
 
         if (ex_csr_use_imm) begin
             ex_csr_wdata = {59'd0, ex_csr_zimm};
         end else begin
             ex_csr_wdata = ex_rs1_data_fwd;
+        end
+    end
+
+    always_ff @(posedge clk) begin
+        if (rst || id_ex_flush) begin
+            ex_rs1_data_fwd_hold <= 64'd0;
+            ex_rs2_data_fwd_hold <= 64'd0;
+            ex_hold_pc <= 64'd0;
+            ex_hold_active <= 1'b0;
+        end else begin
+            if (lsu_mem_stall) begin
+                ex_rs1_data_fwd_hold <= ex_rs1_data_fwd;
+                ex_rs2_data_fwd_hold <= ex_rs2_data_fwd;
+                ex_hold_pc <= ex_pc;
+                ex_hold_active <= 1'b1;
+            end else begin
+                if (ex_hold_active && (ex_pc != ex_hold_pc)) begin
+                    ex_hold_active <= 1'b0;
+                end
+
+                if (!(ex_hold_active && (ex_pc == ex_hold_pc))) begin
+                    ex_rs1_data_fwd_hold <= ex_rs1_data_fwd_live;
+                    ex_rs2_data_fwd_hold <= ex_rs2_data_fwd_live;
+                end
+            end
         end
     end
 
