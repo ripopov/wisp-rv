@@ -1,5 +1,5 @@
 {
-  "name": "wisp-rv64-mem-comp",
+  "name": "ooo-cpu",
   "build": {
     "dockerfile": "Dockerfile",
     "context": ".."

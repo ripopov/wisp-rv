@@ -1,12 +1,19 @@
-# mem-comp experiments
+# ooo-cpu experiments
 
-This repository contains a small memory-comparison flow that:
+This repository tracks incremental milestones toward an out-of-order RISC-V core.
+
+Current milestone in this repo:
 
 - builds a reproducible devcontainer for open-source EDA,
 - implements a simple 2-way set-associative cache in SystemVerilog,
 - generates cache SRAM macros with OpenRAM (FreePDK45 tech, netlist-only mode),
 - synthesizes on Nangate45 with Yosys,
 - and runs pre-PnR timing in OpenSTA.
+
+## Long-term goal
+
+- Build a complete out-of-order RISC-V CPU core.
+- Get there in small, validated steps (memory subsystem, pipelines, scheduling, execution, and integration).
 
 ## Project layout
 
