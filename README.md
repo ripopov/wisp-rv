@@ -77,6 +77,26 @@ Artifacts:
 - Synthesized netlist: `build/synth/set_assoc_cache_2way_synth.v`
 - OpenSTA pre-PnR reports: `reports/sta/`
 
+## GitHub Actions CI
+
+Workflow: `.github/workflows/eda-ci.yml`
+
+On each push, pull request, or manual dispatch, CI runs:
+
+- setup + tool bootstrap,
+- OpenRAM macro generation,
+- simulation tests,
+- synthesis,
+- and pre-PnR STA.
+
+CI publishes a markdown + JSON summary at `reports/ci/` and includes:
+
+- test status,
+- synthesis gate count,
+- STA WNS/TNS,
+- implied max clock frequency,
+- and the max critical-path report excerpt.
+
 ## Notes
 
 - OpenRAM is configured in netlist-only mode to keep the flow lightweight and deterministic.

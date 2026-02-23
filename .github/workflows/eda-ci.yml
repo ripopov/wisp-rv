@@ -1,0 +1,114 @@
+name: EDA CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  EDA_IMAGE: hpretl/iic-osic-tools:latest
+
+jobs:
+  flow:
+    name: Sim + Synth + Pre-PnR STA
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Pull EDA container
+        run: docker pull "$EDA_IMAGE"
+
+      - name: Setup tools
+        id: setup
+        continue-on-error: true
+        run: |
+          docker run --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            "$EDA_IMAGE" --skip bash -lc "make setup"
+
+      - name: Generate OpenRAM macros
+        id: openram
+        if: ${{ steps.setup.outcome == 'success' }}
+        continue-on-error: true
+        run: |
+          docker run --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            "$EDA_IMAGE" --skip bash -lc "make openram"
+
+      - name: Run simulation tests
+        id: sim
+        if: ${{ steps.setup.outcome == 'success' }}
+        continue-on-error: true
+        run: |
+          docker run --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            "$EDA_IMAGE" --skip bash -lc "make sim"
+
+      - name: Run synthesis
+        id: synth
+        if: ${{ steps.openram.outcome == 'success' }}
+        continue-on-error: true
+        run: |
+          docker run --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            "$EDA_IMAGE" --skip bash -lc "make synth"
+
+      - name: Run pre-PnR STA
+        id: sta
+        if: ${{ steps.synth.outcome == 'success' }}
+        continue-on-error: true
+        run: |
+          docker run --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            "$EDA_IMAGE" --skip bash -lc "make sta"
+
+      - name: Build CI report
+        if: always()
+        env:
+          SETUP_STATUS: ${{ steps.setup.outcome }}
+          OPENRAM_STATUS: ${{ steps.openram.outcome }}
+          SIM_STATUS: ${{ steps.sim.outcome }}
+          SYNTH_STATUS: ${{ steps.synth.outcome }}
+          STA_STATUS: ${{ steps.sta.outcome }}
+        run: |
+          python3 scripts/generate_ci_report.py \
+            --setup-status "$SETUP_STATUS" \
+            --openram-status "$OPENRAM_STATUS" \
+            --sim-status "$SIM_STATUS" \
+            --synth-status "$SYNTH_STATUS" \
+            --sta-status "$STA_STATUS" \
+            --output-md reports/ci/summary.md \
+            --output-json reports/ci/summary.json
+
+          cat reports/ci/summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload flow artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eda-flow-reports
+          if-no-files-found: warn
+          path: |
+            reports/ci
+            reports/sta
+            build/synth
+            build/openram
+
+      - name: Enforce flow success
+        if: ${{ always() && (steps.setup.outcome != 'success' || steps.openram.outcome != 'success' || steps.sim.outcome != 'success' || steps.synth.outcome != 'success' || steps.sta.outcome != 'success') }}
+        run: |
+          echo "Flow stage status:"
+          echo "  setup   = ${{ steps.setup.outcome }}"
+          echo "  openram = ${{ steps.openram.outcome }}"
+          echo "  sim     = ${{ steps.sim.outcome }}"
+          echo "  synth   = ${{ steps.synth.outcome }}"
+          echo "  sta     = ${{ steps.sta.outcome }}"
+          exit 1

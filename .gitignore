@@ -1,3 +1,6 @@
 /.tools/
 /build/
 /reports/sta/
+/reports/ci/
+__pycache__/
+*.pyc
