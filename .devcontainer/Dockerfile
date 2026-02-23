@@ -17,5 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN ln -sf /foss/tools/bin/sta /usr/local/bin/opensta
 
+RUN command -v spike >/dev/null && command -v riscv64-unknown-elf-gcc >/dev/null
+
 ENTRYPOINT []
 CMD ["sleep", "infinity"]

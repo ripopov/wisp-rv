@@ -28,5 +28,7 @@ command -v "${YOSYS_BIN}" >/dev/null
 command -v "${OPENSTA_BIN}" >/dev/null
 command -v iverilog >/dev/null
 command -v python3 >/dev/null
+command -v "${SPIKE_BIN}" >/dev/null
+command -v "${RISCV_CC_BIN}" >/dev/null
 
 printf "Tool setup complete.\n"

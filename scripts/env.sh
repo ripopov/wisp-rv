@@ -24,5 +24,7 @@ export STA_OUT="${STA_OUT:-${PROJECT_ROOT}/reports/sta}"
 export YOSYS_BIN="${YOSYS_BIN:-yosys}"
 export OPENSTA_BIN="${OPENSTA_BIN:-sta}"
 export OPENRAM_COMPILER="${OPENRAM_COMPILER:-${OPENRAM_ROOT}/sram_compiler.py}"
+export SPIKE_BIN="${SPIKE_BIN:-spike}"
+export RISCV_CC_BIN="${RISCV_CC_BIN:-riscv64-unknown-elf-gcc}"
 
 export PATH="/foss/tools/bin:/foss/tools/sak:${PATH}"

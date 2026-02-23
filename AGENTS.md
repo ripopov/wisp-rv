@@ -2,7 +2,7 @@
 
 Guidance for agentic coding tools in this repository.
 Project focus: incremental milestones toward an out-of-order RISC-V core.
-Current milestone: cache + OpenRAM + synth + pre-PnR STA flow.
+Current milestone: cache + OpenRAM + Spike bare-metal smoke test + synth + pre-PnR STA flow.
 
 ## Scope And Priorities
 - Keep the existing EDA flow working end-to-end.
@@ -13,6 +13,7 @@ Current milestone: cache + OpenRAM + synth + pre-PnR STA flow.
 ## Repository Layout
 - `rtl/`: synthesizable SystemVerilog.
 - `tb/`: testbenches.
+- `sw/`: bare-metal RISC-V software examples.
 - `openram/`: OpenRAM SRAM configuration files.
 - `constraints/`: SDC constraints for timing.
 - `scripts/`: flow entry points and utilities.
@@ -34,6 +35,7 @@ Run from repository root.
   - `make setup`
   - `make openram`
   - `make sim`
+  - `make spike`
   - `make synth`
   - `make sta`
 - Clean generated outputs: `make clean`
@@ -47,6 +49,12 @@ Current repo has one behavioral testbench: `tb/tb_set_assoc_cache.sv`.
   - `vvp build/sim/tb_set_assoc_cache.vvp`
 
 If more tests are added, keep single-test invocation explicit and top-based.
+
+## Running Spike Bare-Metal Example
+- Default: `make spike`
+- Direct compile/run:
+  - `riscv64-unknown-elf-gcc -march=rv64imac -mabi=lp64 -mcmodel=medany -msmall-data-limit=0 -nostdlib -nostartfiles -ffreestanding -Wl,-T,sw/basic/linker.ld -Wl,--no-warn-rwx-segments -Wl,--build-id=none sw/basic/start.S sw/basic/main.c -o build/spike/basic.elf`
+  - `spike --isa=rv64imac build/spike/basic.elf`
 
 ## Lint / Static Checks
 No dedicated lint target exists yet. Use ad hoc checks:
@@ -66,11 +74,13 @@ Use the same container and uid/gid mapping as CI:
 - `docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" -w /work hpretl/iic-osic-tools:latest --skip bash -lc "make setup"`
 - `docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" -w /work hpretl/iic-osic-tools:latest --skip bash -lc "make openram"`
 - `docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" -w /work hpretl/iic-osic-tools:latest --skip bash -lc "make sim"`
+- `docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" -w /work hpretl/iic-osic-tools:latest --skip bash -lc "make spike"`
 - `docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" -w /work hpretl/iic-osic-tools:latest --skip bash -lc "make synth"`
 - `docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" -w /work hpretl/iic-osic-tools:latest --skip bash -lc "make sta"`
 
 ## Expected Outputs
 - OpenRAM artifacts: `build/openram/`
+- Spike artifact: `build/spike/basic.elf`
 - Synth netlist: `build/synth/set_assoc_cache_2way_synth.v`
 - STA reports: `reports/sta/`
 - CI summary: `reports/ci/summary.md`, `reports/ci/summary.json`

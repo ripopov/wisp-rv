@@ -6,6 +6,7 @@ Current milestone in this repo:
 
 - builds a reproducible devcontainer for open-source EDA,
 - implements a simple 2-way set-associative cache in SystemVerilog,
+- builds and runs a bare-metal RV64 C smoke test on Spike,
 - generates cache SRAM macros with OpenRAM (FreePDK45 tech, netlist-only mode),
 - synthesizes on Nangate45 with Yosys,
 - and runs pre-PnR timing in OpenSTA.
@@ -20,6 +21,7 @@ Current milestone in this repo:
 - `.devcontainer/`: devcontainer definition and Dockerfile
 - `rtl/`: cache RTL and SRAM wrappers
 - `tb/`: behavioral testbench
+- `sw/`: bare-metal RISC-V software examples
 - `openram/`: OpenRAM macro config files
 - `constraints/`: SDC constraints for pre-PnR timing
 - `scripts/`: setup and flow scripts
@@ -53,6 +55,11 @@ make flow
 - OpenRAM `v1.2.48`
 - OpenROAD-flow-scripts (sparse checkout of `flow/platforms/nangate45`)
 
+It also verifies that these tools are available in PATH:
+
+- `spike` (riscv-isa-sim)
+- `riscv64-unknown-elf-gcc` (bare-metal cross compiler)
+
 ## Running the flow
 
 Run each stage individually:
@@ -61,6 +68,7 @@ Run each stage individually:
 make setup
 make openram
 make sim
+make spike
 make synth
 make sta
 ```
@@ -74,8 +82,22 @@ make flow
 Artifacts:
 
 - OpenRAM outputs: `build/openram/`
+- Spike bare-metal ELF: `build/spike/basic.elf`
 - Synthesized netlist: `build/synth/set_assoc_cache_2way_synth.v`
 - OpenSTA pre-PnR reports: `reports/sta/`
+
+## Spike bare-metal example
+
+The repository includes a minimal freestanding RV64 example in `sw/basic/`.
+
+Build and run it under Spike:
+
+```bash
+make spike
+```
+
+This compiles the ELF with `riscv64-unknown-elf-gcc` and executes it with
+`spike --isa=rv64imac`.
 
 ## GitHub Actions CI
 
@@ -86,6 +108,7 @@ On each push, pull request, or manual dispatch, CI runs:
 - setup + tool bootstrap,
 - OpenRAM macro generation,
 - simulation tests,
+- Spike bare-metal smoke test,
 - synthesis,
 - and pre-PnR STA.
 
