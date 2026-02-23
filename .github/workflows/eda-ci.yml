@@ -26,6 +26,7 @@ jobs:
         continue-on-error: true
         run: |
           docker run --rm \
+            --user "$(id -u):$(id -g)" \
             -v "$PWD:/work" \
             -w /work \
             "$EDA_IMAGE" --skip bash -lc "make setup"
@@ -36,6 +37,7 @@ jobs:
         continue-on-error: true
         run: |
           docker run --rm \
+            --user "$(id -u):$(id -g)" \
             -v "$PWD:/work" \
             -w /work \
             "$EDA_IMAGE" --skip bash -lc "make openram"
@@ -46,6 +48,7 @@ jobs:
         continue-on-error: true
         run: |
           docker run --rm \
+            --user "$(id -u):$(id -g)" \
             -v "$PWD:/work" \
             -w /work \
             "$EDA_IMAGE" --skip bash -lc "make sim"
@@ -56,6 +59,7 @@ jobs:
         continue-on-error: true
         run: |
           docker run --rm \
+            --user "$(id -u):$(id -g)" \
             -v "$PWD:/work" \
             -w /work \
             "$EDA_IMAGE" --skip bash -lc "make synth"
@@ -66,6 +70,7 @@ jobs:
         continue-on-error: true
         run: |
           docker run --rm \
+            --user "$(id -u):$(id -g)" \
             -v "$PWD:/work" \
             -w /work \
             "$EDA_IMAGE" --skip bash -lc "make sta"
