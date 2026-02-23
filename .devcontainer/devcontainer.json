@@ -1,0 +1,17 @@
+{
+  "name": "wisp-rv64-mem-comp",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "workspaceFolder": "/workspaces/wisp-rv64",
+  "postCreateCommand": "bash ./scripts/setup_tools.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.makefile-tools",
+        "mshr-h.veriloghdl"
+      ]
+    }
+  }
+}
