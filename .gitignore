@@ -4,3 +4,4 @@
 /reports/ci/
 __pycache__/
 *.pyc
+temp/
