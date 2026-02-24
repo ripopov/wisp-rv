@@ -96,6 +96,7 @@ Heavy compile steps are capped by default:
 - `FLOW_JOBS=min(host_cores, 4)`
 - `SYSTEMC_BUILD_JOBS=${FLOW_JOBS}` for `make setup`
 - `VERILATOR_JOBS=${FLOW_JOBS}` for `make sim`
+- `MAX_PARALLEL_JOBS=4` hard cap for all of the above (including pre-set env vars)
 
 Override locally when needed:
 
@@ -103,7 +104,11 @@ Override locally when needed:
 FLOW_JOBS=2 make flow
 SYSTEMC_BUILD_JOBS=2 make setup
 VERILATOR_JOBS=2 make sim
+MAX_PARALLEL_JOBS=2 make sim
 ```
+
+Note: this project intentionally uses `WISP_VERILATOR_CMD` (not `VERILATOR_BIN`)
+to avoid conflicting with Verilator wrapper internals.
 
 Artifacts:
 

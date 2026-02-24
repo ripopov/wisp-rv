@@ -61,7 +61,7 @@ fi
 
 command -v "${YOSYS_BIN}" >/dev/null
 command -v "${OPENSTA_BIN}" >/dev/null
-command -v "${VERILATOR_BIN}" >/dev/null
+command -v "${WISP_VERILATOR_CMD}" >/dev/null
 command -v python3 >/dev/null
 command -v pip3 >/dev/null
 command -v cmake >/dev/null

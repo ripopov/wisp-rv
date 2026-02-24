@@ -9,7 +9,7 @@ if [ ! -f "${SYSTEMC_INCLUDE}/systemc" ] || ! compgen -G "${SYSTEMC_LIBDIR}/libs
     "${PROJECT_ROOT}/scripts/setup_tools.sh"
 fi
 
-command -v "${VERILATOR_BIN}" >/dev/null
+command -v "${WISP_VERILATOR_CMD}" >/dev/null
 
 export SYSTEMC_INCLUDE
 export SYSTEMC_LIBDIR
@@ -22,7 +22,7 @@ if ! [[ "${sim_jobs}" =~ ^[0-9]+$ ]] || [ "${sim_jobs}" -lt 1 ]; then
 fi
 printf "Running Verilator build with %s job(s)\n" "${sim_jobs}"
 
-"${VERILATOR_BIN}" \
+env -u VERILATOR_BIN "${WISP_VERILATOR_CMD}" \
     --sc \
     --timing \
     --build \
