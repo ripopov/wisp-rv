@@ -5,7 +5,11 @@
     "context": ".."
   },
   "workspaceFolder": "/workspaces/wisp-rv64",
-  "postCreateCommand": "bash ./scripts/setup_tools.sh",
+  "containerEnv": {
+    "OPENRAM_ROOT": "/opt/wisp-tools/OpenRAM",
+    "ORFS_ROOT": "/opt/wisp-tools/OpenROAD-flow-scripts",
+    "SYSTEMC_ROOT": "/opt/wisp-tools/systemc"
+  },
   "customizations": {
     "vscode": {
       "extensions": [

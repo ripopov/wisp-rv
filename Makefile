@@ -20,7 +20,8 @@ synth:
 sta:
 	bash ./scripts/run_sta.sh
 
-flow: setup openram sim spike synth sta
+flow:
+	bash ./scripts/run_all.sh
 
 clean:
 	rm -rf ./build ./reports/sta

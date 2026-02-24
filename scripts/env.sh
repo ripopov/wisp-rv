@@ -7,11 +7,34 @@ TOOLS_DIR="${TOOLS_DIR:-${PROJECT_ROOT}/.tools}"
 export PROJECT_ROOT
 export TOOLS_DIR
 
+detected_jobs="$(getconf _NPROCESSORS_ONLN 2>/dev/null || printf "4")"
+if ! [[ "${detected_jobs}" =~ ^[0-9]+$ ]] || [ "${detected_jobs}" -lt 1 ]; then
+    detected_jobs=4
+fi
+if [ "${detected_jobs}" -gt 4 ]; then
+    detected_jobs=4
+fi
+
+export FLOW_JOBS="${FLOW_JOBS:-${detected_jobs}}"
+export SYSTEMC_BUILD_JOBS="${SYSTEMC_BUILD_JOBS:-${FLOW_JOBS}}"
+export VERILATOR_JOBS="${VERILATOR_JOBS:-${FLOW_JOBS}}"
+export CMAKE_BUILD_PARALLEL_LEVEL="${CMAKE_BUILD_PARALLEL_LEVEL:-${SYSTEMC_BUILD_JOBS}}"
+
 export OPENRAM_ROOT="${OPENRAM_ROOT:-${TOOLS_DIR}/OpenRAM}"
 export ORFS_ROOT="${ORFS_ROOT:-${TOOLS_DIR}/OpenROAD-flow-scripts}"
 
 export OPENRAM_HOME="${OPENRAM_HOME:-${OPENRAM_ROOT}/compiler}"
 export OPENRAM_TECH="${OPENRAM_TECH:-${OPENRAM_ROOT}/technology}"
+export SYSTEMC_ROOT="${SYSTEMC_ROOT:-${TOOLS_DIR}/systemc}"
+export SYSTEMC_TAG="${SYSTEMC_TAG:-3.0.2}"
+export SYSTEMC_BUILD="${SYSTEMC_BUILD:-${SYSTEMC_ROOT}/build}"
+export SYSTEMC_INSTALL="${SYSTEMC_INSTALL:-${SYSTEMC_ROOT}/install}"
+export SYSTEMC_INCLUDE="${SYSTEMC_INCLUDE:-${SYSTEMC_INSTALL}/include}"
+export SYSTEMC_LIBDIR="${SYSTEMC_LIBDIR:-${SYSTEMC_INSTALL}/lib}"
+
+if [ ! -f "${SYSTEMC_LIBDIR}/libsystemc.so" ] && [ ! -f "${SYSTEMC_LIBDIR}/libsystemc.dylib" ] && [ -d "${SYSTEMC_INSTALL}/lib64" ]; then
+    export SYSTEMC_LIBDIR="${SYSTEMC_INSTALL}/lib64"
+fi
 
 export NANGATE45_ROOT="${NANGATE45_ROOT:-${ORFS_ROOT}/flow/platforms/nangate45}"
 export NANGATE45_LIB="${NANGATE45_LIB:-${NANGATE45_ROOT}/lib/NangateOpenCellLibrary_typical.lib}"
@@ -24,6 +47,7 @@ export STA_OUT="${STA_OUT:-${PROJECT_ROOT}/reports/sta}"
 export YOSYS_BIN="${YOSYS_BIN:-yosys}"
 export OPENSTA_BIN="${OPENSTA_BIN:-sta}"
 export OPENRAM_COMPILER="${OPENRAM_COMPILER:-${OPENRAM_ROOT}/sram_compiler.py}"
+export VERILATOR_BIN="${VERILATOR_BIN:-verilator}"
 export SPIKE_BIN="${SPIKE_BIN:-spike}"
 export RISCV_CC_BIN="${RISCV_CC_BIN:-riscv64-unknown-elf-gcc}"
 

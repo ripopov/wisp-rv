@@ -12,7 +12,7 @@ Current milestone: cache + OpenRAM + Spike bare-metal smoke test + synth + pre-P
 
 ## Repository Layout
 - `rtl/`: synthesizable SystemVerilog.
-- `tb/`: testbenches.
+- `tb/`: SystemC testbenches for Verilator simulation.
 - `sw/`: bare-metal RISC-V software examples.
 - `openram/`: OpenRAM SRAM configuration files.
 - `constraints/`: SDC constraints for timing.
@@ -22,10 +22,14 @@ Current milestone: cache + OpenRAM + Spike bare-metal smoke test + synth + pre-P
 
 ## Environment
 - Base container: `hpretl/iic-osic-tools:latest`.
-- Devcontainer post-create command: `bash ./scripts/setup_tools.sh`.
+- Devcontainer pre-installs tool sources under `/opt/wisp-tools` and exports:
+  - `OPENRAM_ROOT=/opt/wisp-tools/OpenRAM`
+  - `ORFS_ROOT=/opt/wisp-tools/OpenROAD-flow-scripts`
+  - `SYSTEMC_ROOT=/opt/wisp-tools/systemc`
 - Tool bootstrap clones:
   - OpenRAM `v1.2.48`
   - OpenROAD-flow-scripts (sparse checkout for Nangate45)
+  - SystemC `3.0.2`
 
 ## Canonical Build/Test Commands
 Run from repository root.
@@ -39,14 +43,20 @@ Run from repository root.
   - `make synth`
   - `make sta`
 - Clean generated outputs: `make clean`
+- Concurrency controls (defaults are capped to reduce local OOM risk):
+  - `FLOW_JOBS` (global cap, defaults to `min(host_cores, 4)`)
+  - `SYSTEMC_BUILD_JOBS` (defaults to `FLOW_JOBS`)
+  - `VERILATOR_JOBS` (defaults to `FLOW_JOBS`)
 
 ## Running A Single Test (Important)
-Current repo has one behavioral testbench: `tb/tb_set_assoc_cache.sv`.
+Current repo has one behavioral testbench: `tb/tb_set_assoc_cache.cpp`.
 
 - Default: `make sim`
-- Direct single-test compile/run:
-  - `iverilog -g2012 -o build/sim/tb_set_assoc_cache.vvp rtl/cache_sram_1rw.sv rtl/set_assoc_cache_2way.sv tb/tb_set_assoc_cache.sv`
-  - `vvp build/sim/tb_set_assoc_cache.vvp`
+- Direct single-test build/run:
+  - `source scripts/env.sh`
+  - `export LD_LIBRARY_PATH="${SYSTEMC_LIBDIR}:${LD_LIBRARY_PATH:-}"`
+  - `verilator --sc --timing --build -j 1 -Wno-DECLFILENAME -Wno-UNUSEDSIGNAL --Mdir build/sim/obj_dir --top-module set_assoc_cache_2way --exe tb/tb_set_assoc_cache.cpp -o tb_set_assoc_cache_sim rtl/cache_sram_1rw.sv rtl/set_assoc_cache_2way.sv`
+  - `build/sim/obj_dir/tb_set_assoc_cache_sim`
 
 If more tests are added, keep single-test invocation explicit and top-based.
 
@@ -59,10 +69,8 @@ If more tests are added, keep single-test invocation explicit and top-based.
 ## Lint / Static Checks
 No dedicated lint target exists yet. Use ad hoc checks:
 
-- Icarus compile sanity:
-  - `iverilog -g2012 -Wall -t null rtl/cache_sram_1rw.sv rtl/set_assoc_cache_2way.sv tb/tb_set_assoc_cache.sv`
-- Optional Verilator lint:
-  - `verilator --lint-only -Wall rtl/cache_sram_1rw.sv rtl/set_assoc_cache_2way.sv tb/tb_set_assoc_cache.sv`
+- Verilator lint:
+  - `verilator --lint-only -Wall rtl/cache_sram_1rw.sv rtl/set_assoc_cache_2way.sv`
 - Python syntax check:
   - `python3 -m py_compile scripts/generate_ci_report.py`
 - Shell syntax check:
@@ -80,6 +88,7 @@ Use the same container and uid/gid mapping as CI:
 
 ## Expected Outputs
 - OpenRAM artifacts: `build/openram/`
+- Simulation executable: `build/sim/obj_dir/tb_set_assoc_cache_sim`
 - Spike artifact: `build/spike/basic.elf`
 - Synth netlist: `build/synth/set_assoc_cache_2way_synth.v`
 - STA reports: `reports/sta/`
@@ -99,9 +108,9 @@ Use the same container and uid/gid mapping as CI:
 - Keep OpenRAM wrapper ports aligned with macro names (`clk0/csb0/web0/...`).
 
 ## Testbench Style Guidelines
-- Use `` `timescale 1ns/1ps``.
-- Use `task automatic` helpers for bus transactions.
-- Fail on mismatches with `$fatal(1, ...)`.
+- Use deterministic cycle stepping (`sc_start`) and avoid wall-clock sleeps.
+- Keep helpers for request/response handshakes small and explicit.
+- Fail fast with clear stderr messages and non-zero exit status.
 - Print an explicit PASS marker at end of a successful run.
 - Keep tests deterministic; avoid unseeded random behavior.
 
