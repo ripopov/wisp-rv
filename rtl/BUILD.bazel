@@ -1,0 +1,6 @@
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "cache_sram_1rw.sv",
+    "set_assoc_cache_2way.sv",
+])

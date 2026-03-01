@@ -25,7 +25,8 @@ Current milestone in this repo:
 - `sw/`: bare-metal RISC-V software examples
 - `openram/`: OpenRAM macro config files
 - `constraints/`: SDC constraints for pre-PnR timing
-- `scripts/`: setup and flow scripts
+- `flow/`: Bazel stage runners
+- `scripts/`: STA TCL + CI report utility
 
 ## Cache microarchitecture
 
@@ -45,13 +46,13 @@ SRAM macro targets:
 
 The devcontainer uses `hpretl/iic-osic-tools` as base and adds a stable CLI-friendly entrypoint.
 It pre-installs pinned OpenRAM/ORFS/SystemC tool sources under `/opt/wisp-tools`
-and sets `OPENRAM_ROOT`, `ORFS_ROOT`, and `SYSTEMC_ROOT` in container env, so
-manual `make setup` is not required for normal devcontainer use.
+and sets `OPENRAM_ROOT`, `ORFS_ROOT`, and `SYSTEMC_ROOT` in container env.
+It also installs Bazelisk as `bazel` and uses `.bazelversion` to pin Bazel.
 
 Open in VS Code and rebuild container, then run:
 
 ```bash
-make flow
+bazel run //flow:all
 ```
 
 Pinned tool versions:
@@ -62,49 +63,44 @@ Pinned tool versions:
 
 It also verifies that these tools are available in PATH:
 
+- `bazel`
 - `verilator`
 - `spike` (riscv-isa-sim)
 - `riscv64-unknown-elf-gcc` (bare-metal cross compiler)
-
-`make setup` remains available as a fallback bootstrap for non-devcontainer
-environments.
 
 ## Running the flow
 
 Run each stage individually:
 
 ```bash
-make setup
-make openram
-make sim
-make spike
-make synth
-make sta
+bazel run //flow:openram
+bazel run //flow:sim
+bazel run //flow:spike
+bazel run //flow:synth
+bazel run //flow:sta
 ```
 
 Or run all at once:
 
 ```bash
-make flow
+bazel run //flow:all
 ```
 
-`make flow` executes stages serially via `scripts/run_all.sh` to avoid accidental
-stage fanout under `make -j`.
+`//flow:all` executes stages serially (`openram -> sim -> spike -> synth -> sta`).
+Clean generated flow artifacts with `bazel run //flow:clean`.
 
-Heavy compile steps are capped by default:
+Heavy compile steps are capped by default in `flow/flow_runner.sh`:
 
 - `FLOW_JOBS=min(host_cores, 4)`
-- `SYSTEMC_BUILD_JOBS=${FLOW_JOBS}` for `make setup`
-- `VERILATOR_JOBS=${FLOW_JOBS}` for `make sim`
-- `MAX_PARALLEL_JOBS=4` hard cap for all of the above (including pre-set env vars)
+- `VERILATOR_JOBS=${FLOW_JOBS}` for `bazel run //flow:sim`
+- `MAX_PARALLEL_JOBS=4` hard cap (including pre-set env vars)
 
 Override locally when needed:
 
 ```bash
-FLOW_JOBS=2 make flow
-SYSTEMC_BUILD_JOBS=2 make setup
-VERILATOR_JOBS=2 make sim
-MAX_PARALLEL_JOBS=2 make sim
+FLOW_JOBS=2 bazel run //flow:all
+VERILATOR_JOBS=2 bazel run //flow:sim
+MAX_PARALLEL_JOBS=2 bazel run //flow:sim
 ```
 
 Note: this project intentionally uses `WISP_VERILATOR_CMD` (not `VERILATOR_BIN`)
@@ -120,15 +116,19 @@ Artifacts:
 
 ## Simulation test
 
-`make sim` compiles and runs `tb/tb_set_assoc_cache.cpp` using Verilator's
+`bazel run //flow:sim` compiles and runs `tb/tb_set_assoc_cache.cpp` using Verilator's
 SystemC flow (`--sc`).
 
 To run the SystemC test directly:
 
 ```bash
-source scripts/env.sh
+SYSTEMC_ROOT="${SYSTEMC_ROOT:-/opt/wisp-tools/systemc}"
+SYSTEMC_LIBDIR="${SYSTEMC_LIBDIR:-${SYSTEMC_ROOT}/install/lib}"
+if [ ! -f "${SYSTEMC_LIBDIR}/libsystemc.so" ] && [ -d "${SYSTEMC_ROOT}/install/lib64" ]; then
+  SYSTEMC_LIBDIR="${SYSTEMC_ROOT}/install/lib64"
+fi
 export LD_LIBRARY_PATH="${SYSTEMC_LIBDIR}:${LD_LIBRARY_PATH:-}"
-verilator --sc --timing --build -j "${VERILATOR_JOBS}" -Wno-DECLFILENAME -Wno-UNUSEDSIGNAL \
+verilator --sc --timing --build -j 1 -Wno-DECLFILENAME -Wno-UNUSEDSIGNAL \
   --Mdir build/sim/obj_dir \
   --top-module set_assoc_cache_2way \
   --exe tb/tb_set_assoc_cache.cpp \
@@ -144,7 +144,7 @@ The repository includes a minimal freestanding RV64 example in `sw/basic/`.
 Build and run it under Spike:
 
 ```bash
-make spike
+bazel run //flow:spike
 ```
 
 This compiles the ELF with `riscv64-unknown-elf-gcc` and executes it with
@@ -156,7 +156,6 @@ Workflow: `.github/workflows/eda-ci.yml`
 
 On each push, pull request, or manual dispatch, CI runs:
 
-- setup + tool bootstrap,
 - OpenRAM macro generation,
 - simulation tests,
 - Spike bare-metal smoke test,

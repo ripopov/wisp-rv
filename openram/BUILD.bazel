@@ -1,0 +1,6 @@
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "cfg_data_32x64_1rw.py",
+    "cfg_tag_24x64_1rw.py",
+])

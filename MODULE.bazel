@@ -1,0 +1,4 @@
+module(
+    name = "wisp_rv64",
+    version = "0.1.0",
+)

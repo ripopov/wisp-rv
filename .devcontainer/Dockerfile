@@ -9,6 +9,7 @@ ENV TOOLCACHE_ROOT=/opt/wisp-tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     cmake \
+    curl \
     g++ \
     git \
     iverilog \
@@ -17,6 +18,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     verilator \
     && rm -rf /var/lib/apt/lists/*
+
+ARG BAZELISK_VERSION=v1.20.0
+
+RUN arch="$(uname -m)" && \
+    case "${arch}" in \
+        x86_64) bazelisk_arch="amd64" ;; \
+        aarch64|arm64) bazelisk_arch="arm64" ;; \
+        *) echo "Unsupported architecture: ${arch}" >&2; exit 1 ;; \
+    esac && \
+    curl -fsSL -o /usr/local/bin/bazel "https://github.com/bazelbuild/bazelisk/releases/download/${BAZELISK_VERSION}/bazelisk-linux-${bazelisk_arch}" && \
+    chmod +x /usr/local/bin/bazel
 
 RUN ln -sf /foss/tools/bin/sta /usr/local/bin/opensta
 
@@ -34,7 +46,9 @@ RUN mkdir -p "${TOOLCACHE_ROOT}" && \
     cmake --build "${TOOLCACHE_ROOT}/systemc/build" -j4 && \
     cmake --install "${TOOLCACHE_ROOT}/systemc/build"
 
-RUN command -v spike >/dev/null && command -v riscv64-unknown-elf-gcc >/dev/null
+RUN command -v bazel >/dev/null && \
+    command -v spike >/dev/null && \
+    command -v riscv64-unknown-elf-gcc >/dev/null
 
 ENTRYPOINT []
 CMD ["sleep", "infinity"]

@@ -13,7 +13,7 @@
   "customizations": {
     "vscode": {
       "extensions": [
-        "ms-vscode.makefile-tools",
+        "bazelbuild.vscode-bazel",
         "mshr-h.veriloghdl"
       ]
     }

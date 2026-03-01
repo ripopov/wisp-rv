@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  EDA_IMAGE: hpretl/iic-osic-tools:latest
+  EDA_IMAGE: wisp-eda-tools:ci
 
 jobs:
   flow:
@@ -18,51 +18,50 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Pull EDA container
-        run: docker pull "$EDA_IMAGE"
-
-      - name: Setup tools
-        id: setup
+      - name: Build EDA container
+        id: container
         continue-on-error: true
         run: |
-          docker run --rm \
-            --user "$(id -u):$(id -g)" \
-            -v "$PWD:/work" \
-            -w /work \
-            "$EDA_IMAGE" --skip bash -lc "make setup"
+          docker build -t "$EDA_IMAGE" -f .devcontainer/Dockerfile .
 
       - name: Generate OpenRAM macros
         id: openram
-        if: ${{ steps.setup.outcome == 'success' }}
+        if: ${{ steps.container.outcome == 'success' }}
         continue-on-error: true
         run: |
           docker run --rm \
             --user "$(id -u):$(id -g)" \
+            -e USER=ci \
+            -e HOME=/tmp \
             -v "$PWD:/work" \
             -w /work \
-            "$EDA_IMAGE" --skip bash -lc "make openram"
+            "$EDA_IMAGE" bash -lc "bazel run //flow:openram"
 
       - name: Run simulation tests
         id: sim
-        if: ${{ steps.setup.outcome == 'success' }}
+        if: ${{ steps.container.outcome == 'success' }}
         continue-on-error: true
         run: |
           docker run --rm \
             --user "$(id -u):$(id -g)" \
+            -e USER=ci \
+            -e HOME=/tmp \
             -v "$PWD:/work" \
             -w /work \
-            "$EDA_IMAGE" --skip bash -lc "make sim"
+            "$EDA_IMAGE" bash -lc "bazel run //flow:sim"
 
       - name: Run Spike bare-metal example
         id: spike
-        if: ${{ steps.setup.outcome == 'success' }}
+        if: ${{ steps.container.outcome == 'success' }}
         continue-on-error: true
         run: |
           docker run --rm \
             --user "$(id -u):$(id -g)" \
+            -e USER=ci \
+            -e HOME=/tmp \
             -v "$PWD:/work" \
             -w /work \
-            "$EDA_IMAGE" --skip bash -lc "make spike"
+            "$EDA_IMAGE" bash -lc "bazel run //flow:spike"
 
       - name: Run synthesis
         id: synth
@@ -71,9 +70,11 @@ jobs:
         run: |
           docker run --rm \
             --user "$(id -u):$(id -g)" \
+            -e USER=ci \
+            -e HOME=/tmp \
             -v "$PWD:/work" \
             -w /work \
-            "$EDA_IMAGE" --skip bash -lc "make synth"
+            "$EDA_IMAGE" bash -lc "bazel run //flow:synth"
 
       - name: Run pre-PnR STA
         id: sta
@@ -82,14 +83,15 @@ jobs:
         run: |
           docker run --rm \
             --user "$(id -u):$(id -g)" \
+            -e USER=ci \
+            -e HOME=/tmp \
             -v "$PWD:/work" \
             -w /work \
-            "$EDA_IMAGE" --skip bash -lc "make sta"
+            "$EDA_IMAGE" bash -lc "bazel run //flow:sta"
 
       - name: Build CI report
         if: always()
         env:
-          SETUP_STATUS: ${{ steps.setup.outcome }}
           OPENRAM_STATUS: ${{ steps.openram.outcome }}
           SIM_STATUS: ${{ steps.sim.outcome }}
           SPIKE_STATUS: ${{ steps.spike.outcome }}
@@ -97,7 +99,6 @@ jobs:
           STA_STATUS: ${{ steps.sta.outcome }}
         run: |
           python3 scripts/generate_ci_report.py \
-            --setup-status "$SETUP_STATUS" \
             --openram-status "$OPENRAM_STATUS" \
             --sim-status "$SIM_STATUS" \
             --spike-status "$SPIKE_STATUS" \
@@ -122,13 +123,13 @@ jobs:
             build/spike
 
       - name: Enforce flow success
-        if: ${{ always() && (steps.setup.outcome != 'success' || steps.openram.outcome != 'success' || steps.sim.outcome != 'success' || steps.spike.outcome != 'success' || steps.synth.outcome != 'success' || steps.sta.outcome != 'success') }}
+        if: ${{ always() && (steps.container.outcome != 'success' || steps.openram.outcome != 'success' || steps.sim.outcome != 'success' || steps.spike.outcome != 'success' || steps.synth.outcome != 'success' || steps.sta.outcome != 'success') }}
         run: |
           echo "Flow stage status:"
-          echo "  setup   = ${{ steps.setup.outcome }}"
-          echo "  openram = ${{ steps.openram.outcome }}"
-          echo "  sim     = ${{ steps.sim.outcome }}"
-          echo "  spike   = ${{ steps.spike.outcome }}"
-          echo "  synth   = ${{ steps.synth.outcome }}"
-          echo "  sta     = ${{ steps.sta.outcome }}"
+          echo "  container = ${{ steps.container.outcome }}"
+          echo "  openram   = ${{ steps.openram.outcome }}"
+          echo "  sim       = ${{ steps.sim.outcome }}"
+          echo "  spike     = ${{ steps.spike.outcome }}"
+          echo "  synth     = ${{ steps.synth.outcome }}"
+          echo "  sta       = ${{ steps.sta.outcome }}"
           exit 1

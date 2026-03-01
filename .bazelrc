@@ -1,0 +1,14 @@
+common --announce_rc
+common --enable_bzlmod
+
+build --jobs=4
+build --keep_going
+build --spawn_strategy=local
+
+test --jobs=4
+test --keep_going
+test --spawn_strategy=local
+
+run --jobs=4
+run --keep_going
+run --spawn_strategy=local

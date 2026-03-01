@@ -16,7 +16,8 @@ Current milestone: cache + OpenRAM + Spike bare-metal smoke test + synth + pre-P
 - `sw/`: bare-metal RISC-V software examples.
 - `openram/`: OpenRAM SRAM configuration files.
 - `constraints/`: SDC constraints for timing.
-- `scripts/`: flow entry points and utilities.
+- `flow/`: Bazel stage runners.
+- `scripts/`: utilities (`opensta_prenpr.tcl`, `generate_ci_report.py`).
 - `.github/workflows/eda-ci.yml`: canonical CI execution.
 - `.devcontainer/`: recommended local environment.
 
@@ -26,6 +27,7 @@ Current milestone: cache + OpenRAM + Spike bare-metal smoke test + synth + pre-P
   - `OPENRAM_ROOT=/opt/wisp-tools/OpenRAM`
   - `ORFS_ROOT=/opt/wisp-tools/OpenROAD-flow-scripts`
   - `SYSTEMC_ROOT=/opt/wisp-tools/systemc`
+- Devcontainer installs Bazelisk as `bazel` and pins Bazel via `.bazelversion`.
 - Tool bootstrap clones:
   - OpenRAM `v1.2.48`
   - OpenROAD-flow-scripts (sparse checkout for Nangate45)
@@ -34,26 +36,27 @@ Current milestone: cache + OpenRAM + Spike bare-metal smoke test + synth + pre-P
 ## Canonical Build/Test Commands
 Run from repository root.
 
-- Full flow: `make flow`
+- Full flow: `bazel run //flow:all`
 - Stage-by-stage:
-  - `make setup`
-  - `make openram`
-  - `make sim`
-  - `make spike`
-  - `make synth`
-  - `make sta`
-- Clean generated outputs: `make clean`
+  - `bazel run //flow:openram`
+  - `bazel run //flow:sim`
+  - `bazel run //flow:spike`
+  - `bazel run //flow:synth`
+  - `bazel run //flow:sta`
+- Clean generated outputs: `bazel run //flow:clean`
 - Concurrency controls (defaults are capped to reduce local OOM risk):
   - `FLOW_JOBS` (global cap, defaults to `min(host_cores, 4)`)
-  - `SYSTEMC_BUILD_JOBS` (defaults to `FLOW_JOBS`)
   - `VERILATOR_JOBS` (defaults to `FLOW_JOBS`)
+  - `MAX_PARALLEL_JOBS` (defaults to `4`)
 
 ## Running A Single Test (Important)
 Current repo has one behavioral testbench: `tb/tb_set_assoc_cache.cpp`.
 
-- Default: `make sim`
+- Default: `bazel run //flow:sim`
 - Direct single-test build/run:
-  - `source scripts/env.sh`
+  - `export SYSTEMC_ROOT="${SYSTEMC_ROOT:-/opt/wisp-tools/systemc}"`
+  - `export SYSTEMC_LIBDIR="${SYSTEMC_LIBDIR:-${SYSTEMC_ROOT}/install/lib}"`
+  - `if [ ! -f "${SYSTEMC_LIBDIR}/libsystemc.so" ] && [ -d "${SYSTEMC_ROOT}/install/lib64" ]; then export SYSTEMC_LIBDIR="${SYSTEMC_ROOT}/install/lib64"; fi`
   - `export LD_LIBRARY_PATH="${SYSTEMC_LIBDIR}:${LD_LIBRARY_PATH:-}"`
   - `verilator --sc --timing --build -j 1 -Wno-DECLFILENAME -Wno-UNUSEDSIGNAL --Mdir build/sim/obj_dir --top-module set_assoc_cache_2way --exe tb/tb_set_assoc_cache.cpp -o tb_set_assoc_cache_sim rtl/cache_sram_1rw.sv rtl/set_assoc_cache_2way.sv`
   - `build/sim/obj_dir/tb_set_assoc_cache_sim`
@@ -61,7 +64,7 @@ Current repo has one behavioral testbench: `tb/tb_set_assoc_cache.cpp`.
 If more tests are added, keep single-test invocation explicit and top-based.
 
 ## Running Spike Bare-Metal Example
-- Default: `make spike`
+- Default: `bazel run //flow:spike`
 - Direct compile/run:
   - `riscv64-unknown-elf-gcc -march=rv64imac -mabi=lp64 -mcmodel=medany -msmall-data-limit=0 -nostdlib -nostartfiles -ffreestanding -Wl,-T,sw/basic/linker.ld -Wl,--no-warn-rwx-segments -Wl,--build-id=none sw/basic/start.S sw/basic/main.c -o build/spike/basic.elf`
   - `spike --isa=rv64imac build/spike/basic.elf`
@@ -74,17 +77,17 @@ No dedicated lint target exists yet. Use ad hoc checks:
 - Python syntax check:
   - `python3 -m py_compile scripts/generate_ci_report.py`
 - Shell syntax check:
-  - `bash -n scripts/*.sh`
+  - `bash -n flow/*.sh`
 
 ## CI Reproduction (Local Docker)
 Use the same container and uid/gid mapping as CI:
 
-- `docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" -w /work hpretl/iic-osic-tools:latest --skip bash -lc "make setup"`
-- `docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" -w /work hpretl/iic-osic-tools:latest --skip bash -lc "make openram"`
-- `docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" -w /work hpretl/iic-osic-tools:latest --skip bash -lc "make sim"`
-- `docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" -w /work hpretl/iic-osic-tools:latest --skip bash -lc "make spike"`
-- `docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" -w /work hpretl/iic-osic-tools:latest --skip bash -lc "make synth"`
-- `docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" -w /work hpretl/iic-osic-tools:latest --skip bash -lc "make sta"`
+- `docker build -t wisp-eda-tools:ci -f .devcontainer/Dockerfile .`
+- `docker run --rm --user "$(id -u):$(id -g)" -e USER=ci -e HOME=/tmp -v "$PWD:/work" -w /work wisp-eda-tools:ci bash -lc "bazel run //flow:openram"`
+- `docker run --rm --user "$(id -u):$(id -g)" -e USER=ci -e HOME=/tmp -v "$PWD:/work" -w /work wisp-eda-tools:ci bash -lc "bazel run //flow:sim"`
+- `docker run --rm --user "$(id -u):$(id -g)" -e USER=ci -e HOME=/tmp -v "$PWD:/work" -w /work wisp-eda-tools:ci bash -lc "bazel run //flow:spike"`
+- `docker run --rm --user "$(id -u):$(id -g)" -e USER=ci -e HOME=/tmp -v "$PWD:/work" -w /work wisp-eda-tools:ci bash -lc "bazel run //flow:synth"`
+- `docker run --rm --user "$(id -u):$(id -g)" -e USER=ci -e HOME=/tmp -v "$PWD:/work" -w /work wisp-eda-tools:ci bash -lc "bazel run //flow:sta"`
 
 ## Expected Outputs
 - OpenRAM artifacts: `build/openram/`
@@ -118,7 +121,7 @@ Use the same container and uid/gid mapping as CI:
 - Start scripts with:
   - `#!/usr/bin/env bash`
   - `set -euo pipefail`
-- Source `scripts/env.sh` when flow paths/tools are needed.
+- Keep flow environment resolution explicit inside each script.
 - Quote variable expansions (`"${VAR}"`).
 - Use `printf` (especially for errors/status).
 - Validate required files/tools early and fail fast.

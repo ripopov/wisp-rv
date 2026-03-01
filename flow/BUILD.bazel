@@ -1,0 +1,63 @@
+package(default_visibility = ["//visibility:public"])
+
+FLOW_DATA = [
+    "//constraints:set_assoc_cache_2way.sdc",
+    "//openram:cfg_data_32x64_1rw.py",
+    "//openram:cfg_tag_24x64_1rw.py",
+    "//rtl:cache_sram_1rw.sv",
+    "//rtl:set_assoc_cache_2way.sv",
+    "//scripts:opensta_prenpr.tcl",
+    "//sw/basic:linker.ld",
+    "//sw/basic:main.c",
+    "//sw/basic:start.S",
+    "//tb:tb_set_assoc_cache.cpp",
+]
+
+sh_binary(
+    name = "openram",
+    srcs = ["flow_runner.sh"],
+    args = ["openram"],
+    data = FLOW_DATA,
+)
+
+sh_binary(
+    name = "sim",
+    srcs = ["flow_runner.sh"],
+    args = ["sim"],
+    data = FLOW_DATA,
+)
+
+sh_binary(
+    name = "spike",
+    srcs = ["flow_runner.sh"],
+    args = ["spike"],
+    data = FLOW_DATA,
+)
+
+sh_binary(
+    name = "synth",
+    srcs = ["flow_runner.sh"],
+    args = ["synth"],
+    data = FLOW_DATA,
+)
+
+sh_binary(
+    name = "sta",
+    srcs = ["flow_runner.sh"],
+    args = ["sta"],
+    data = FLOW_DATA,
+)
+
+sh_binary(
+    name = "all",
+    srcs = ["flow_runner.sh"],
+    args = ["all"],
+    data = FLOW_DATA,
+)
+
+sh_binary(
+    name = "clean",
+    srcs = ["flow_runner.sh"],
+    args = ["clean"],
+    data = FLOW_DATA,
+)

@@ -120,9 +120,8 @@ def fmt_num(value, digits=3):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate CI markdown report for setup/openram/sim/spike/synth/STA flow."
+        description="Generate CI markdown report for openram/sim/spike/synth/STA flow."
     )
-    parser.add_argument("--setup-status", default="unknown")
     parser.add_argument("--openram-status", default="unknown")
     parser.add_argument("--sim-status", default="unknown")
     parser.add_argument("--spike-status", default="unknown")
@@ -136,7 +135,6 @@ def main():
     output_md = Path(args.output_md)
     output_md.parent.mkdir(parents=True, exist_ok=True)
 
-    setup_status = parse_status(args.setup_status)
     openram_status = parse_status(args.openram_status)
     sim_status = parse_status(args.sim_status)
     spike_status = parse_status(args.spike_status)
@@ -165,7 +163,6 @@ def main():
     critical_excerpt = parse_critical_path_excerpt(checks_max_path)
 
     stages = [
-        ("Setup", setup_status),
         ("OpenRAM", openram_status),
         ("Simulation", sim_status),
         ("Spike", spike_status),
