@@ -3,4 +3,8 @@ package(default_visibility = ["//visibility:public"])
 exports_files([
     "cache_sram_1rw.sv",
     "set_assoc_cache_2way.sv",
+    "bench/bench_add32_pipe.sv",
+    "bench/bench_mux8x32_pipe.sv",
+    "bench/bench_cmp64_pipe.sv",
+    "bench/bench_fifo_ctrl_small.sv",
 ])

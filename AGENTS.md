@@ -43,6 +43,7 @@ Run from repository root.
   - `bazel run //flow:spike`
   - `bazel run //flow:synth`
   - `bazel run //flow:sta`
+  - `bazel run //flow:explore_nangate45` (optional study target)
 - `//:flow` aliases `//flow:all` and avoids Bazel wildcard ambiguity warnings.
 - Clean generated outputs: `bazel run //flow:clean`
 - Concurrency controls (defaults are capped to reduce local OOM risk):
@@ -76,7 +77,7 @@ No dedicated lint target exists yet. Use ad hoc checks:
 - Verilator lint:
   - `verilator --lint-only -Wall rtl/cache_sram_1rw.sv rtl/set_assoc_cache_2way.sv`
 - Python syntax check:
-  - `python3 -m py_compile scripts/generate_ci_report.py`
+  - `python3 -m py_compile scripts/generate_ci_report.py scripts/gen_openram_cfg_matrix.py scripts/generate_explore_report.py`
 - Shell syntax check:
   - `bash -n flow/*.sh`
 
@@ -97,6 +98,7 @@ Use the same container and uid/gid mapping as CI:
 - Synth netlist: `build/synth/set_assoc_cache_2way_synth.v`
 - STA reports: `reports/sta/`
 - CI summary: `reports/ci/summary.md`, `reports/ci/summary.json`
+- Exploration study: `reports/studies/nangate45_openram_freepdk45/`
 
 ## SystemVerilog Style Guidelines
 - Use `logic` (avoid legacy `reg/wire` unless required).

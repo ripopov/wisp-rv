@@ -2,11 +2,23 @@ package(default_visibility = ["//visibility:public"])
 
 FLOW_DATA = [
     "//constraints:set_assoc_cache_2way.sdc",
+    "//constraints:bench/bench_add32_pipe.sdc",
+    "//constraints:bench/bench_mux8x32_pipe.sdc",
+    "//constraints:bench/bench_cmp64_pipe.sdc",
+    "//constraints:bench/bench_fifo_ctrl_small.sdc",
+    "//constraints:bench/bench_ram_wrap.sdc",
     "//openram:cfg_data_32x64_1rw.py",
     "//openram:cfg_tag_24x64_1rw.py",
     "//rtl:cache_sram_1rw.sv",
     "//rtl:set_assoc_cache_2way.sv",
+    "//rtl:bench/bench_add32_pipe.sv",
+    "//rtl:bench/bench_mux8x32_pipe.sv",
+    "//rtl:bench/bench_cmp64_pipe.sv",
+    "//rtl:bench/bench_fifo_ctrl_small.sv",
+    "//scripts:gen_openram_cfg_matrix.py",
+    "//scripts:generate_explore_report.py",
     "//scripts:opensta_prenpr.tcl",
+    "//scripts:opensta_prenpr_study.tcl",
     "//sw/basic:linker.ld",
     "//sw/basic:main.c",
     "//sw/basic:start.S",
@@ -52,6 +64,13 @@ sh_binary(
     name = "all",
     srcs = ["flow_runner.sh"],
     args = ["all"],
+    data = FLOW_DATA,
+)
+
+sh_binary(
+    name = "explore_nangate45",
+    srcs = ["flow_runner.sh"],
+    args = ["explore_nangate45"],
     data = FLOW_DATA,
 )
 

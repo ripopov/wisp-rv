@@ -78,6 +78,7 @@ bazel run //flow:sim
 bazel run //flow:spike
 bazel run //flow:synth
 bazel run //flow:sta
+bazel run //flow:explore_nangate45
 ```
 
 Or run all at once:
@@ -88,6 +89,10 @@ bazel run //:flow
 
 `//:flow` aliases `//flow:all` and executes stages serially (`openram -> sim -> spike -> synth -> sta`).
 Clean generated flow artifacts with `bazel run //flow:clean`.
+
+`//flow:explore_nangate45` is an optional study target. It sweeps a fixed logic
+benchmark suite plus OpenRAM geometries on Nangate45 and generates a frequency
+ranking report under `reports/studies/nangate45_openram_freepdk45/`.
 
 Heavy compile steps are capped by default in `flow/flow_runner.sh`:
 
@@ -113,6 +118,7 @@ Artifacts:
 - Spike bare-metal ELF: `build/spike/basic.elf`
 - Synthesized netlist: `build/synth/set_assoc_cache_2way_synth.v`
 - OpenSTA pre-PnR reports: `reports/sta/`
+- Exploration study reports: `reports/studies/nangate45_openram_freepdk45/`
 
 ## Simulation test
 

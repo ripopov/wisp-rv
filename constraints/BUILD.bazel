@@ -2,4 +2,9 @@ package(default_visibility = ["//visibility:public"])
 
 exports_files([
     "set_assoc_cache_2way.sdc",
+    "bench/bench_add32_pipe.sdc",
+    "bench/bench_mux8x32_pipe.sdc",
+    "bench/bench_cmp64_pipe.sdc",
+    "bench/bench_fifo_ctrl_small.sdc",
+    "bench/bench_ram_wrap.sdc",
 ])
