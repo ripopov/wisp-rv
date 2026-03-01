@@ -36,13 +36,14 @@ Current milestone: cache + OpenRAM + Spike bare-metal smoke test + synth + pre-P
 ## Canonical Build/Test Commands
 Run from repository root.
 
-- Full flow: `bazel run //flow:all`
+- Full flow: `bazel run //:flow`
 - Stage-by-stage:
   - `bazel run //flow:openram`
   - `bazel run //flow:sim`
   - `bazel run //flow:spike`
   - `bazel run //flow:synth`
   - `bazel run //flow:sta`
+- `//:flow` aliases `//flow:all` and avoids Bazel wildcard ambiguity warnings.
 - Clean generated outputs: `bazel run //flow:clean`
 - Concurrency controls (defaults are capped to reduce local OOM risk):
   - `FLOW_JOBS` (global cap, defaults to `min(host_cores, 4)`)

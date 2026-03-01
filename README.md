@@ -52,7 +52,7 @@ It also installs Bazelisk as `bazel` and uses `.bazelversion` to pin Bazel.
 Open in VS Code and rebuild container, then run:
 
 ```bash
-bazel run //flow:all
+bazel run //:flow
 ```
 
 Pinned tool versions:
@@ -83,10 +83,10 @@ bazel run //flow:sta
 Or run all at once:
 
 ```bash
-bazel run //flow:all
+bazel run //:flow
 ```
 
-`//flow:all` executes stages serially (`openram -> sim -> spike -> synth -> sta`).
+`//:flow` aliases `//flow:all` and executes stages serially (`openram -> sim -> spike -> synth -> sta`).
 Clean generated flow artifacts with `bazel run //flow:clean`.
 
 Heavy compile steps are capped by default in `flow/flow_runner.sh`:
@@ -98,7 +98,7 @@ Heavy compile steps are capped by default in `flow/flow_runner.sh`:
 Override locally when needed:
 
 ```bash
-FLOW_JOBS=2 bazel run //flow:all
+FLOW_JOBS=2 bazel run //:flow
 VERILATOR_JOBS=2 bazel run //flow:sim
 MAX_PARALLEL_JOBS=2 bazel run //flow:sim
 ```
@@ -169,6 +169,19 @@ CI publishes a markdown + JSON summary at `reports/ci/` and includes:
 - STA WNS/TNS,
 - implied max clock frequency,
 - and the max critical-path report excerpt.
+
+## CI Reproduction (Local Docker)
+
+Use the same container and uid/gid mapping as CI:
+
+```bash
+docker build -t wisp-eda-tools:ci -f .devcontainer/Dockerfile .
+docker run --rm --user "$(id -u):$(id -g)" -e USER=ci -e HOME=/tmp -v "$PWD:/work" -w /work wisp-eda-tools:ci bash -lc "bazel run //flow:openram"
+docker run --rm --user "$(id -u):$(id -g)" -e USER=ci -e HOME=/tmp -v "$PWD:/work" -w /work wisp-eda-tools:ci bash -lc "bazel run //flow:sim"
+docker run --rm --user "$(id -u):$(id -g)" -e USER=ci -e HOME=/tmp -v "$PWD:/work" -w /work wisp-eda-tools:ci bash -lc "bazel run //flow:spike"
+docker run --rm --user "$(id -u):$(id -g)" -e USER=ci -e HOME=/tmp -v "$PWD:/work" -w /work wisp-eda-tools:ci bash -lc "bazel run //flow:synth"
+docker run --rm --user "$(id -u):$(id -g)" -e USER=ci -e HOME=/tmp -v "$PWD:/work" -w /work wisp-eda-tools:ci bash -lc "bazel run //flow:sta"
+```
 
 ## Notes
 
